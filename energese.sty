@@ -2,7 +2,7 @@
 \ProvidesPackage{energese}[2026/01/28 Energese ESL Diagram Package]
 
 \RequirePackage{tikz}
-\usetikzlibrary{positioning, arrows.meta, shapes.geometric}
+\usetikzlibrary{positioning, arrows.meta, shapes.geometric, calc}
 \RequirePackage{luacode}
 \RequirePackage{environ}
 
@@ -11,12 +11,13 @@
 
 % TikZ Styles
 \tikzset{
-    energese source/.style={draw, shape=energese source, minimum size=0.8cm},
-    energese producer/.style={draw, shape=energese producer, minimum size=1cm},
-    energese consumer/.style={draw, shape=energese consumer, minimum size=1cm},
-    energese storage/.style={draw, shape=energese storage, minimum size=0.8cm},
-    energese interaction/.style={draw, shape=energese interaction, minimum size=1cm},
-    energese transaction/.style={draw, shape=energese transaction, minimum size=1cm},
+    energese source/.style={draw, shape=energese source, minimum size=0.8cm, align=center},
+    energese producer/.style={draw, shape=energese producer, minimum size=1cm, align=center},
+    energese consumer/.style={draw, shape=energese consumer, minimum size=1cm, align=center},
+    energese storage/.style={draw, shape=energese storage, minimum size=0.8cm, align=center},
+    energese interaction/.style={draw, shape=energese interaction, minimum size=1cm, align=center},
+    energese transaction/.style={draw, shape=energese transaction, minimum size=1cm, align=center},
+    energese text/.style={align=center},
     % Edge styles
     energese energy/.style={->, thick, solid},
     energese material/.style={->, thick, solid},
@@ -26,6 +27,7 @@
 }
 
 \begin{luacode*}
+    -- Add current directory to package path for manual runs
     package.path = package.path .. ";./?.lua"
     energese = require("energese-core")
 \end{luacode*}

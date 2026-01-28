@@ -1,0 +1,31 @@
+{
+  "nodes": [
+    { "id": "sun", "type": "source", "Tr": 1, "label": "Sun", "x": 0, "y": 0, "magnitude": 1.5 },
+    { "id": "fuels", "type": "source", "Tr": 1000, "label": "Fuels,\\\\Minerals", "x": 18, "y": 8 },
+    { "id": "env_systems", "type": "producer", "Tr": 10, "label": "Environmental\\\\Systems", "x": 6, "y": 1 },
+    { "id": "agri", "type": "producer", "Tr": 10, "label": "Agriculture", "x": 12, "y": -3 },
+    { "id": "industry", "type": "consumer", "Tr": 1000, "label": "Industry", "x": 18, "y": 2, "magnitude": 1.5 },
+    { "id": "consumer", "type": "consumer", "Tr": 10000, "label": "Consumer\\\\Human Service", "x": 26, "y": -1 },
+    { "id": "human_service_label", "type": "text", "label": "Human Service", "x": 27, "y": 5.5 }
+  ],
+  "edges": [
+    { "from": "sun", "to": "env_systems", "type": "energy", "label": "6000", "options": "bend left=20" },
+    { "from": "sun", "to": "agri", "type": "energy", "label": "5280", "options": "bend right=20" },
+    { "from": "fuels", "to": "industry", "type": "energy", "label": "17.6", "from_anchor": "south", "to_anchor": "north" },
+    { "from": "env_systems", "to": "industry", "type": "energy", "options": "bend left=10" },
+    { "from": "agri", "to": "industry", "type": "energy", "options": "bend right=10" },
+    { "from": "agri", "to": "consumer", "type": "energy", "options": "bend right=15" },
+    { "from": "industry", "to": "consumer", "type": "energy", "options": "bend left=10" },
+    { "from": "consumer", "to": "agri", "type": "money_feedback", "label": "\\$", "options": "bend left=90, looseness=2.0" },
+    { "from": "consumer", "to": "industry", "type": "money_feedback", "label": "\\$ $1.1 \\times 10^{12}$", "options": "bend right=70" },
+    { "from": "industry", "to": "agri", "type": "money_feedback", "label": "\\$", "options": "bend right=40" }
+  ],
+  "metadata": {
+    "heat_sink_label": "11,297.6",
+    "ground_x": 18,
+    "heat_sink_y": -6,
+    "system_boundary": {
+      "x_min": 3, "x_max": 31, "y_min": -5, "y_max": 6, "label": "$10^{15}$ Calories per Year"
+    }
+  }
+}
