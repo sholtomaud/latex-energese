@@ -19,13 +19,27 @@ energese/
 ├── energese.sty              # Main package file (generated)
 ├── energese-core.lua         # Core Lua algorithms (generated)
 ├── energese-shapes.tex       # PGF shape definitions (generated)
+├── reference-images/         # Reference Odum diagrams (ground truth targets)
+│   ├── aggregated-economy.png
+│   ├── crop-harvest.png
+│   ├── modern-civilisation.png
+│   ├── pyramids-as-organisers.png
+│   ├── source-store.png
+│   ├── store.png
+│   └── strong-source.png
+├── examples/                 # JSON data files matching reference images
+│   ├── aggregated-economy.json
+│   ├── crop-harvest.json     # (to be created)
+│   └── ...                   # Additional examples
 ├── tests/
 │   ├── unit/                 # Unit tests for individual functions
 │   ├── integration/          # Integration tests for complete workflows
+│   ├── visual-regression/    # Generated vs. reference comparisons
 │   ├── fixtures/             # Test JSON data files
 │   └── expected/             # Expected PDF outputs
 ├── docs/
 │   ├── energese_requirements.md  # Requirements specification
+│   ├── generated/            # Generated example PDFs for documentation
 │   └── examples/             # Example documents
 └── AGENTS.md                 # This file
 ```
@@ -856,9 +870,396 @@ This test should intentionally fail with clear error messages.
 
 ---
 
-## Phase 10: Documentation and Examples
+## Phase 10: Visual Regression Testing and Reference Image Reproduction
 
-### Agent Task 10.1: User Documentation
+### Overview
+
+This phase validates that the energese package can precisely reproduce Howard T. Odum's original diagram styles. Each reference image in `reference-images/` represents a ground truth target that the package should be able to generate from JSON data.
+
+### Agent Task 10.1: Visual Regression Test Suite
+
+**Objective**: Automate comparison of generated diagrams against reference images.
+
+**Test File**: `tests/visual-regression/test_all_references.sh`
+
+```bash
+#!/bin/bash
+# Visual regression test suite for Energese package
+
+TEST_DIR="tests/visual-regression"
+REF_DIR="reference-images"
+EXAMPLES_DIR="examples"
+OUTPUT_DIR="$TEST_DIR/output"
+DIFF_DIR="$TEST_DIR/diffs"
+
+mkdir -p "$OUTPUT_DIR" "$DIFF_DIR"
+
+FAILED=0
+TOTAL=0
+
+# Function to test one reference image
+test_reference() {
+    local ref_name=$1
+    local json_file="$EXAMPLES_DIR/${ref_name}.json"
+    local ref_image="$REF_DIR/${ref_name}.png"
+    local output_pdf="$OUTPUT_DIR/${ref_name}.pdf"
+    local output_png="$OUTPUT_DIR/${ref_name}.png"
+    local diff_image="$DIFF_DIR/${ref_name}_diff.png"
+    
+    echo "=========================================="
+    echo "Testing: $ref_name"
+    echo "=========================================="
+    
+    # Check if JSON exists
+    if [ ! -f "$json_file" ]; then
+        echo "⚠ SKIP: $json_file not yet created"
+        return
+    fi
+    
+    TOTAL=$((TOTAL + 1))
+    
+    # Generate PDF from JSON
+    cat > "$OUTPUT_DIR/test_${ref_name}.tex" <<EOF
+\\documentclass{standalone}
+\\usepackage{energese}
+\\begin{document}
+\\renderEnergese{../../$json_file}
+\\end{document}
+EOF
+    
+    cd "$OUTPUT_DIR" || exit 1
+    if ! lualatex -interaction=batchmode "test_${ref_name}.tex" > /dev/null 2>&1; then
+        echo "✗ FAIL: LaTeX compilation failed"
+        FAILED=$((FAILED + 1))
+        cd - > /dev/null || return
+        return
+    fi
+    cd - > /dev/null || return
+    
+    # Convert PDF to PNG at same resolution as reference
+    pdftoppm -png -r 300 "$output_pdf" > "$output_png" 2>/dev/null
+    
+    # Compare images using ImageMagick
+    rmse=$(compare -metric RMSE "$ref_image" "$output_png" "$diff_image" 2>&1 | grep -oE '[0-9]+\.[0-9]+')
+    
+    # Threshold: RMSE < 0.05 (5% difference)
+    if (( $(echo "$rmse < 0.05" | bc -l) )); then
+        echo "✓ PASS: RMSE = $rmse (threshold: 0.05)"
+    else
+        echo "✗ FAIL: RMSE = $rmse (exceeds threshold)"
+        echo "  Diff image saved to: $diff_image"
+        FAILED=$((FAILED + 1))
+    fi
+}
+
+# Test all reference images
+for ref_img in "$REF_DIR"/*.png; do
+    ref_name=$(basename "$ref_img" .png)
+    test_reference "$ref_name"
+done
+
+echo ""
+echo "=========================================="
+echo "VISUAL REGRESSION TEST SUMMARY"
+echo "=========================================="
+echo "Total tests: $TOTAL"
+echo "Passed: $((TOTAL - FAILED))"
+echo "Failed: $FAILED"
+
+if [ $FAILED -eq 0 ]; then
+    echo "✓ All visual regression tests passed!"
+    exit 0
+else
+    echo "✗ Some tests failed. Review diff images in $DIFF_DIR"
+    exit 1
+fi
+```
+
+**Success Criteria**:
+- [ ] Test script runs without errors
+- [ ] All reference images with corresponding JSON files are tested
+- [ ] RMSE values are reported for each comparison
+- [ ] Diff images are generated for failed tests
+- [ ] Script integrates with main test runner (`run_tests.sh`)
+
+---
+
+### Agent Task 10.2: Reference Image Analysis Workflow
+
+**Objective**: Document the process for LLM developers to create JSON files from reference images.
+
+**Deliverable**: `tests/visual-regression/README.md`
+
+```markdown
+# Visual Regression Testing
+
+## Overview
+
+This directory contains tools for validating that the energese package can accurately reproduce Howard T. Odum's energy systems diagrams.
+
+## Reference Images
+
+Location: `../../reference-images/`
+
+Each PNG file represents a target diagram that the package should be able to generate from JSON data.
+
+## Workflow for Creating JSON from Reference Images
+
+### Step 1: Visual Analysis
+
+1. Open the reference image in an image viewer
+2. Identify all nodes (symbols):
+   - Note the symbol type (source, producer, consumer, storage, interaction, transaction)
+   - Estimate relative positions (use image dimensions as coordinate system)
+   - Record any labels or annotations
+3. Identify all edges (flow lines):
+   - Determine source and target nodes
+   - Classify edge type (energy, money_feedback, information, material)
+   - Note any special routing (curves, overhead arcs)
+4. Identify transformity ordering:
+   - Nodes should be arranged left-to-right by increasing transformity
+   - Estimate transformity values that preserve this ordering
+
+### Step 2: Create JSON File
+
+Create a new file in `../../examples/` named to match the reference image.
+
+Example: `crop-harvest.json` for `crop-harvest.png`
+
+JSON template:
+```json
+{
+  "metadata": {
+    "name": "Descriptive Name",
+    "reference_image": "crop-harvest.png",
+    "notes": "Analysis notes and approximations",
+    "show_heat_sink": true,
+    "column_spacing": 3.0,
+    "row_spacing": 1.5
+  },
+  "nodes": [
+    {
+      "id": "unique_id",
+      "type": "source|producer|consumer|storage|interaction|transaction",
+      "Tr": 1.0,
+      "label": "Display Name",
+      "magnitude": 1.0
+    }
+  ],
+  "edges": [
+    {
+      "from": "source_id",
+      "to": "target_id",
+      "type": "energy|money_feedback|information|material"
+    }
+  ]
+}
+```
+
+### Step 3: Generate Test Output
+
+Run the visual regression test:
+```bash
+cd tests/visual-regression
+./test_all_references.sh
+```
+
+### Step 4: Compare and Iterate
+
+1. Review the diff image in `diffs/` directory
+2. Identify discrepancies:
+   - Node positioning errors
+   - Incorrect symbol types
+   - Edge routing issues
+   - Missing or extra elements
+3. Update JSON file to improve match
+4. Re-run test
+5. Repeat until RMSE < 0.05
+
+### Step 5: Document and Commit
+
+Once the test passes:
+1. Add the JSON file to `examples/`
+2. Update this README with any special notes about the diagram
+3. Commit both the JSON file and any package improvements
+
+## Image Comparison Metrics
+
+**RMSE (Root Mean Square Error)**:
+- Threshold: 0.05 (5% difference)
+- Lower is better
+- Values < 0.02 indicate excellent match
+- Values > 0.10 indicate significant differences
+
+**Interpreting Diff Images**:
+- Red areas: pixels in generated image but not in reference
+- Blue areas: pixels in reference but not in generated
+- White areas: perfect match
+
+## Troubleshooting
+
+**High RMSE despite visual similarity**:
+- Check image resolution and DPI settings
+- Ensure anti-aliasing settings match
+- Verify color spaces are consistent
+
+**LaTeX compilation fails**:
+- Check JSON syntax using a JSON validator
+- Verify all node IDs referenced in edges exist
+- Check for special characters in labels (escape backslashes)
+
+**Reference image not found**:
+- Verify file is in `reference-images/` directory
+- Check filename matches exactly (case-sensitive)
+- Ensure file is PNG format
+```
+
+**Implementation Requirements**:
+- Create `tests/visual-regression/` directory
+- Add `test_all_references.sh` script with execute permissions
+- Create `README.md` with complete workflow documentation
+- Update main `tests/run_tests.sh` to include visual regression tests
+
+**Success Criteria**:
+- [ ] Visual regression test script is executable and functional
+- [ ] README provides clear guidance for LLM developers
+- [ ] Workflow is documented with examples
+- [ ] Integration with existing test infrastructure complete
+
+---
+
+### Agent Task 10.3: Reference Image Catalog
+
+**Objective**: Document each reference image with analysis notes.
+
+**Deliverable**: Add section to this document cataloging each reference image.
+
+#### Reference Image Catalog
+
+##### 1. aggregated-economy.png
+**Status**: ✓ JSON exists (`examples/aggregated-economy.json`)
+
+**Description**: Multi-level economic system showing sun, environmental systems, agriculture, industry, and consumer sectors with monetary feedback loops.
+
+**Key Features**:
+- Complex feedback loops (money flows back from consumers)
+- System boundary annotation
+- Heat sink labeling with numerical values
+- Multiple transformity levels (1, 10, 1000, 10000)
+
+**Testing Focus**:
+- Overhead arc routing for feedback edges
+- System boundary rendering
+- Magnitude scaling for large nodes
+- Edge label positioning
+
+---
+
+##### 2. crop-harvest.png
+**Status**: ⚠ JSON to be created (`examples/crop-harvest.json`)
+
+**Description**: Agricultural system showing crop growth and harvest cycles.
+
+**Preliminary Analysis**:
+- Likely includes: sun (source), rain (source), crops (producer), storage, harvest (consumer)
+- May feature seasonal/cyclical flows
+- Storage symbols for crop inventory
+
+**Testing Focus**:
+- Storage tank symbol rendering
+- Multiple source inputs
+- Seasonal flow representation
+
+---
+
+##### 3. modern-civilisation.png
+**Status**: ⚠ JSON to be created (`examples/modern-civilisation.json`)
+
+**Description**: Complex civilizational system with multiple layers.
+
+**Preliminary Analysis**:
+- Likely multi-layer diagram (control, main, decomposition)
+- Industrial and economic components
+- Resource depletion pathways
+
+**Testing Focus**:
+- Layer hint positioning (control above, decomposition below)
+- Complex edge routing with many crossing paths
+- Large-scale system layout
+
+---
+
+##### 4. pyramids-as-organisers.png
+**Status**: ⚠ JSON to be created (`examples/pyramids-as-organisers.json`)
+
+**Description**: Hierarchical pyramid structure showing energy quality transformations.
+
+**Preliminary Analysis**:
+- Pyramidal/hierarchical layout
+- Energy quality increasing vertically
+- Organizational structure representation
+
+**Testing Focus**:
+- Hierarchical node arrangement
+- Energy quality gradients
+- Symmetrical branching patterns
+
+---
+
+##### 5. source-store.png
+**Status**: ⚠ JSON to be created (`examples/source-store.json`)
+
+**Description**: Basic interaction between source and storage components.
+
+**Preliminary Analysis**:
+- Minimal system: source → storage interaction
+- Good test case for basic functionality
+- May include limiting factors (interaction symbols)
+
+**Testing Focus**:
+- Storage symbol accuracy
+- Interaction (valve) symbol rendering
+- Simple linear flow layout
+
+---
+
+##### 6. store.png
+**Status**: ⚠ JSON to be created (`examples/store.json`)
+
+**Description**: Storage symbol variations and connections.
+
+**Preliminary Analysis**:
+- Focus on storage tank symbols
+- Various input/output configurations
+- May show multiple storage states
+
+**Testing Focus**:
+- Storage symbol anchor points
+- Input/output edge connections
+- Symbol proportions and scaling
+
+---
+
+##### 7. strong-source.png
+**Status**: ⚠ JSON to be created (`examples/strong-source.json`)
+
+**Description**: High-magnitude energy source with downstream effects.
+
+**Preliminary Analysis**:
+- Large/emphasized source symbol
+- Magnitude parameter testing
+- Energy flow concentration
+
+**Testing Focus**:
+- Symbol size scaling based on magnitude
+- Line thickness variation
+- Source symbol rendering at different scales
+
+---
+
+## Phase 11: Documentation and Examples
+
+### Agent Task 11.1: User Documentation
 
 **Deliverable**: `docs/energese_user_guide.tex`
 
@@ -870,7 +1271,7 @@ Must include:
 5. Layout customization options
 6. Troubleshooting guide
 
-### Agent Task 10.2: Example Gallery
+### Agent Task 11.2: Example Gallery
 
 **Deliverable**: `docs/examples/` directory with 5+ complete examples:
 - `simple_food_chain.tex` + `.json`
@@ -953,12 +1354,13 @@ graph TD
     O --> P[Fix Integration Issues]
     P --> Q[Phase 8: Inline JSON Tests]
     Q --> R[Phase 9: Error Handling Tests]
-    R --> S[Phase 10: Documentation]
-    S --> T[Final Validation]
-    T --> U{All Tests Pass?}
-    U -->|No| V[Debug and Fix]
-    V --> T
-    U -->|Yes| W[Package Ready for Release]
+    R --> S[Phase 10: Visual Regression Testing]
+    S --> T[Phase 11: Documentation]
+    T --> U[Final Validation]
+    U --> V{All Tests Pass?}
+    V -->|No| W[Debug and Fix]
+    W --> U
+    V -->|Yes| X[Package Ready for Release]
 ```
 
 ---

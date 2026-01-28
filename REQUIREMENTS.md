@@ -4,6 +4,8 @@
 
 The `energese` package automates the rendering of H.T. Odum's Energy Systems Language (ESL) diagrams using a data-driven approach via LuaLaTeX and TikZ. The package implements Odum's implicit layout rules algorithmically, enabling users to specify complex ecological and industrial systems via JSON data structures rather than manual TikZ coding.
 
+**The package aims to precisely reproduce the visual style and layout of Howard T. Odum's original diagrams, validated through visual regression testing against reference images.** This ensures that generated diagrams maintain the aesthetic and scientific accuracy of Odum's original work.
+
 ## 2. Theoretical Foundation
 
 ### 2.1 Horizontal Axis (X): Energy Quality (Transformity)
@@ -274,6 +276,53 @@ If multiple edges connect same (X_from, X_to) column pair:
   - Annotate with combined flow volume
 ```
 
+### 3.6 Visual Regression Testing
+
+#### 3.6.1 Reference Image Repository
+- **Location**: `reference-images/` directory
+- **Source**: Original H.T. Odum diagrams from published works
+- **Format**: High-resolution PNG files
+- **Purpose**: Ground truth for visual fidelity validation
+
+#### 3.6.2 Test Workflow
+1. Each reference image SHALL have a corresponding JSON data file in `examples/`
+2. JSON file SHALL be named to match reference image (e.g., `aggregated-economy.json` ↔ `aggregated-economy.png`)
+3. Automated tests SHALL:
+   - Render JSON to PDF using `\renderEnergese{}`
+   - Convert PDF to PNG at same resolution as reference
+   - Perform pixel-wise or perceptual image comparison
+   - Report quantitative difference metrics (RMSE, structural similarity)
+
+#### 3.6.3 Acceptance Criteria
+- Generated diagrams MUST match reference images within defined tolerance
+- Default threshold: **RMSE < 0.05** (5% difference) OR pixel difference < 2%
+- Critical elements (symbol shapes, arrow directions, text labels) MUST match exactly
+- Minor variations in anti-aliasing or font rendering are acceptable
+
+#### 3.6.4 Comparison Tools
+- **Primary**: ImageMagick `compare -metric RMSE`
+- **Alternative**: Python `scikit-image` structural similarity index (SSIM)
+- **Output**: Difference images highlighting mismatches in `tests/visual-regression/diffs/`
+
+#### 3.6.5 LLM Developer Workflow
+For each reference image:
+1. **Analyze Reference**: Examine the PNG to identify nodes, edges, transformity ordering, and layout
+2. **Create JSON**: Design corresponding JSON data file in `examples/`
+3. **Generate Output**: Compile JSON to PDF, convert to PNG
+4. **Compare**: Run visual regression test, review RMSE and diff image
+5. **Iterate**: Adjust JSON parameters and rendering code until RMSE < 0.05
+6. **Document**: Generate PDF for `docs/generated/` and commit
+
+#### 3.6.6 Reference Image Catalog
+The repository includes the following reference diagrams:
+- `aggregated-economy.png` - Multi-level economic system with feedback loops
+- `crop-harvest.png` - Agricultural system with storage and seasonal flows
+- `modern-civilisation.png` - Complex civilizational system with multiple layers
+- `pyramids-as-organisers.png` - Hierarchical energy pyramid structure
+- `source-store.png` - Basic source and storage interaction
+- `store.png` - Storage symbol variations and connections
+- `strong-source.png` - High-magnitude energy source with downstream effects
+
 ## 4. Non-Functional Requirements
 
 ### 4.1 Technical Requirements
@@ -298,6 +347,8 @@ If multiple edges connect same (X_from, X_to) column pair:
 - Default colors: black for energy, blue for money, gray for heat
 - Line weights: 1pt for main flows, 0.5pt for feedback, 0.25pt for heat
 - Consistent symbol proportions matching Odum's textbook diagrams
+- **Generated diagrams SHALL match reference images with quantitative fidelity metrics (RMSE < 0.05)**
+- **All reference images in `reference-images/` SHALL have passing visual regression tests**
 
 ## 5. Implementation Architecture
 
@@ -482,6 +533,79 @@ end
 ```
 **Expected Output**: Solid arrow from P1→C1→T1, dashed arc from T1 back to P1 that routes overhead.
 
+### 7.4 Visual Regression Test Cases
+
+For each reference image, the following SHALL be validated:
+
+#### 7.4.1 aggregated-economy.png
+- **JSON**: `examples/aggregated-economy.json`
+- **Tests**: Node positioning, feedback loops, system boundary rendering
+- **Critical features**: Multi-level transformity layout, curved feedback arrows, heat sink labeling
+- **Key validation points**:
+  - 6 distinct transformity levels correctly arranged
+  - Money feedback loops routed overhead with proper arcs
+  - System boundary box rendered with label
+  - Heat sink numerical annotations displayed
+
+#### 7.4.2 crop-harvest.png
+- **JSON**: `examples/crop-harvest.json` (to be created)
+- **Tests**: Agricultural system with storage and seasonal flows
+- **Critical features**: Storage tank symbols, multiple source inputs
+- **Key validation points**:
+  - Storage symbol anchor points correctly positioned
+  - Multiple sources (sun, rain) connect to same producer
+  - Seasonal/cyclical flows if present
+
+#### 7.4.3 modern-civilisation.png
+- **JSON**: `examples/modern-civilisation.json` (to be created)
+- **Tests**: Complex multi-layer system with economic feedback
+- **Critical features**: Layer separation (control, main, decomposition)
+- **Key validation points**:
+  - Control layer nodes positioned above main energy flow
+  - Decomposition layer nodes positioned below
+  - Multiple crossing edges routed without overlap
+  - Large-scale system maintains readability
+
+#### 7.4.4 pyramids-as-organisers.png
+- **JSON**: `examples/pyramids-as-organisers.json` (to be created)
+- **Tests**: Hierarchical energy pyramid structure
+- **Critical features**: Pyramidal layout, energy quality gradients
+- **Key validation points**:
+  - Hierarchical node arrangement (pyramid shape)
+  - Transformity increases vertically and left-to-right
+  - Symmetrical branching patterns
+  - Energy convergence visualization
+
+#### 7.4.5 source-store.png
+- **JSON**: `examples/source-store.json` (to be created)
+- **Tests**: Basic source and storage interaction
+- **Critical features**: Minimal system, interaction symbols
+- **Key validation points**:
+  - Source circle symbol rendering
+  - Storage tank symbol rendering
+  - Interaction (valve) symbol if present
+  - Simple linear flow layout
+
+#### 7.4.6 store.png
+- **JSON**: `examples/store.json` (to be created)
+- **Tests**: Storage symbol variations and connections
+- **Critical features**: Storage tank at different states/sizes
+- **Key validation points**:
+  - Storage symbol anchor points (energy_in, energy_out, heat_sink)
+  - Input/output edge connections to correct anchors
+  - Symbol proportions match reference
+  - Multiple storage configurations if shown
+
+#### 7.4.7 strong-source.png
+- **JSON**: `examples/strong-source.json` (to be created)
+- **Tests**: High-magnitude source symbol scaling
+- **Critical features**: Magnitude parameter effects
+- **Key validation points**:
+  - Source symbol scales correctly with magnitude parameter
+  - Line thickness increases for high-volume flows
+  - Downstream effects of concentrated energy
+  - Symbol remains recognizable at larger sizes
+
 ## 8. Future Enhancements (Out of Scope for V1)
 
 ### 8.1 Interactive Features
@@ -588,6 +712,12 @@ end
 - [ ] Write package documentation with examples
 - [ ] Create test suite with all validation cases
 - [ ] Optimize for performance (50+ nodes)
+- [ ] **Create JSON files for all 7 reference images**
+- [ ] **Implement visual regression test suite (`tests/visual-regression/test_all_references.sh`)**
+- [ ] **Set up automated image comparison pipeline**
+- [ ] **Generate reference documentation PDFs in `docs/generated/`**
+- [ ] **Document workflow for LLM developers to add new examples**
+- [ ] **Ensure all reference images pass visual regression tests (RMSE < 0.05)**
 
 ---
 
