@@ -1,0 +1,10 @@
+*.aux
+*.log
+*.pdf
+output/
+!reference-images/*.png
+!examples/*.json
+!examples/*.tex
+!tests/unit/*.tex
+!tests/integration/*.tex
+!scripts/*.py

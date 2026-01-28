@@ -17,6 +17,11 @@ run_test_suite() {
     local base=$(basename "$suite")
     if lualatex --interaction=nonstopmode --output-directory="$dir" "$suite.tex" > /dev/null 2>&1; then
         echo "✓ PASS: $suite"
+        # Generate PNG for visual verification
+        if [ -f "${suite}.pdf" ]; then
+            pdftoppm -png -singlefile "${suite}.pdf" "$suite"
+            echo "  Generated: ${suite}.png"
+        fi
     else
         echo "✗ FAIL: $suite"
         FAILED=1

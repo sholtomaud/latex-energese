@@ -23,12 +23,16 @@ end
 function energese.validate_node(node)
     if not node.id then return false, "Node missing 'id'" end
     if not node.type then return false, "Node '" .. node.id .. "' missing 'type'" end
-    if not node.Tr then return false, "Node '" .. node.id .. "' missing 'Tr'" end
-    if not node.label then return false, "Node '" .. node.id .. "' missing 'label'" end
+
+    if node.type ~= "text" then
+        if not node.Tr then return false, "Node '" .. node.id .. "' missing 'Tr'" end
+        if not node.label then return false, "Node '" .. node.id .. "' missing 'label'" end
+    end
 
     local valid_types = {
         source = true, producer = true, consumer = true,
-        storage = true, interaction = true, transaction = true
+        storage = true, interaction = true, transaction = true,
+        text = true
     }
     if not valid_types[node.type] then
         return false, "Node '" .. node.id .. "' has invalid type '" .. node.type .. "'"
@@ -109,8 +113,12 @@ end
 function energese.calculate_x_coordinates(nodes, tr_map, spacing)
     local x_coords = {}
     for _, node in ipairs(nodes) do
-        local col = tr_map[node.Tr]
-        x_coords[node.id] = col * spacing
+        if node.x then
+            x_coords[node.id] = node.x
+        else
+            local col = tr_map[node.Tr] or 0
+            x_coords[node.id] = col * spacing
+        end
     end
     return x_coords
 end
@@ -235,14 +243,18 @@ function energese.calculate_vertical_positions(nodes, edges, tr_map, row_spacing
     end
 
     for _, node in ipairs(nodes) do
-        if node.layer_hint == "control" then
-            y_coords[node.id] = (y_coords[node.id] or 0) + row_spacing
-        elseif node.layer_hint == "decomposition" then
-            y_coords[node.id] = (y_coords[node.id] or 0) - row_spacing
-        end
+        if node.y then
+            y_coords[node.id] = node.y
+        else
+            if node.layer_hint == "control" then
+                y_coords[node.id] = (y_coords[node.id] or 0) + row_spacing
+            elseif node.layer_hint == "decomposition" then
+                y_coords[node.id] = (y_coords[node.id] or 0) - row_spacing
+            end
 
-        if node.y_gravity then
-            y_coords[node.id] = (y_coords[node.id] or 0) + node.y_gravity
+            if node.y_gravity then
+                y_coords[node.id] = (y_coords[node.id] or 0) + node.y_gravity
+            end
         end
     end
 
@@ -269,8 +281,9 @@ function energese.render(data, options)
         local x = x_coords[node.id]
         local y = y_coords[node.id]
         local magnitude = node.magnitude or 1.0
+        local label = node.label or ""
         local style = string.format("energese %s, scale=%f", node.type, magnitude)
-        tex.print(string.format("\\node[%s] (%s) at (%f, %f) {%s};", style, node.id, x, y, node.label))
+        tex.print(string.format("\\node[%s] (%s) at (%f, %f) {%s};", style, node.id, x, y, label))
     end
 
     -- Render edges
@@ -290,33 +303,67 @@ function energese.render(data, options)
             to_anchor = "north"
         end
 
-        -- Special case for source which doesn't have energy_in
-        if from == to then -- Should not happen in good diagrams but for safety
-            to_anchor = "north"
-        end
+        -- Handle anchors if explicitly provided in edge
+        if edge.from_anchor then from_anchor = edge.from_anchor end
+        if edge.to_anchor then to_anchor = edge.to_anchor end
 
         local style = string.format("energese %s, line width=%fpt", etype, volume)
-        tex.print(string.format("\\draw[%s] (%s.%s) to (%s.%s);", style, from, from_anchor, to, to_anchor))
+        local options = edge.options or ""
+        local label_code = ""
+        if edge.label then
+            label_code = string.format("node[midway, sloped, above, inner sep=2pt] {%s}", edge.label)
+        end
+
+        tex.print(string.format("\\draw[%s] (%s.%s) to [%s] %s (%s.%s);",
+            style, from, from_anchor, options, label_code, to, to_anchor))
     end
 
     -- Heat sinks
     if not data.metadata or data.metadata.show_heat_sink ~= false then
-        local min_y = 0
-        local max_x = 0
-        for id, y in pairs(y_coords) do
+        local min_y = 1000
+        local max_x = -1000
+        local min_x = 1000
+        for id, x in pairs(x_coords) do
+            local y = y_coords[id]
             if y < min_y then min_y = y end
-            if x_coords[id] > max_x then max_x = x_coords[id] end
+            if x > max_x then max_x = x end
+            if x < min_x then min_x = x end
         end
-        local floor_y = min_y - row_spacing
+        local floor_y = (data.metadata and data.metadata.heat_sink_y) or (min_y - row_spacing)
 
         tex.print(string.format("\\draw[energese heat] (%f, %f) -- (%f, %f);",
-            -1.0, floor_y, max_x + 1.0, floor_y))
+            min_x - 1.0, floor_y, max_x + 1.0, floor_y))
 
         for _, node in ipairs(data.nodes) do
-            if node.type ~= "interaction" and node.type ~= "source" then
-                tex.print(string.format("\\draw[energese heat] (%s.heat_sink) -- (%s.heat_sink |- 0, %f);",
+            if node.type ~= "interaction" and node.type ~= "source" and node.type ~= "text" then
+                tex.print(string.format("\\draw[energese heat] (%s.heat_sink) -- (%s.heat_sink |- 0,%f);",
                     node.id, node.id, floor_y))
             end
+        end
+
+        -- Ground symbol and label
+        local ground_x = (min_x + max_x) / 2
+        if data.metadata and data.metadata.ground_x then ground_x = data.metadata.ground_x end
+
+        tex.print(string.format("\\node[inner sep=0pt, minimum size=0pt] (ground_point) at (%f, %f) {};", ground_x, floor_y))
+        tex.print(string.format("\\draw[energese heat] (ground_point.center) -- ++(0, -0.3);"))
+        tex.print(string.format("\\draw[energese heat] ([xshift=-0.2cm, yshift=-0.3cm]ground_point.center) -- ++(0.4, 0);"))
+        tex.print(string.format("\\draw[energese heat] ([xshift=-0.1cm, yshift=-0.4cm]ground_point.center) -- ++(0.2, 0);"))
+        tex.print(string.format("\\draw[energese heat] ([xshift=-0.05cm, yshift=-0.5cm]ground_point.center) -- ++(0.1, 0);"))
+
+        if data.metadata and data.metadata.heat_sink_label then
+            tex.print(string.format("\\node[anchor=west] at ([xshift=0.3cm, yshift=-0.3cm]ground_point.center) {%s};", data.metadata.heat_sink_label))
+        end
+    end
+
+    -- System Boundary
+    if data.metadata and data.metadata.system_boundary then
+        local sb = data.metadata.system_boundary
+        tex.print(string.format("\\draw[thick] (%f, %f) rectangle (%f, %f);",
+            sb.x_min, sb.y_min, sb.x_max, sb.y_max))
+        if sb.label then
+            tex.print(string.format("\\node[anchor=north west] at (%f, %f) {%s};",
+                sb.x_min, sb.y_min, sb.label))
         end
     end
 
