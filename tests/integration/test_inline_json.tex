@@ -1,0 +1,22 @@
+\documentclass{article}
+\usepackage{energese}
+
+\begin{document}
+
+\section{Inline JSON Test}
+
+\begin{energeseData}
+{
+  "nodes": [
+    {"id": "A", "type": "source", "Tr": 1, "label": "Source"},
+    {"id": "B", "type": "consumer", "Tr": 100, "label": "Sink"}
+  ],
+  "edges": [
+    {"from": "A", "to": "B", "type": "energy"}
+  ]
+}
+\end{energeseData}
+
+The diagram should appear above.
+
+\end{document}

@@ -1,0 +1,14 @@
+{
+  "nodes": [
+    {"id": "S1", "type": "source", "Tr": 1, "label": "Rain"},
+    {"id": "P1", "type": "producer", "Tr": 100, "label": "Trees"},
+    {"id": "P2", "type": "producer", "Tr": 100, "label": "Grass"},
+    {"id": "C1", "type": "consumer", "Tr": 2000, "label": "Deer"}
+  ],
+  "edges": [
+    {"from": "S1", "to": "P1", "type": "energy"},
+    {"from": "S1", "to": "P2", "type": "energy"},
+    {"from": "P1", "to": "C1", "type": "energy"},
+    {"from": "P2", "to": "C1", "type": "energy"}
+  ]
+}

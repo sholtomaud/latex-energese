@@ -1,0 +1,20 @@
+{
+  "metadata": {
+    "name": "Simple ESL System",
+    "show_heat_sink": true,
+    "column_spacing": 3.0,
+    "row_spacing": 1.5
+  },
+  "nodes": [
+    {"id": "sun", "type": "source", "Tr": 1, "label": "Sun"},
+    {"id": "grass", "type": "producer", "Tr": 100, "label": "Grass"},
+    {"id": "cow", "type": "consumer", "Tr": 2000, "label": "Cow"},
+    {"id": "market", "type": "transaction", "Tr": 5000, "label": "Market"}
+  ],
+  "edges": [
+    {"from": "sun", "to": "grass", "type": "energy"},
+    {"from": "grass", "to": "cow", "type": "energy"},
+    {"from": "cow", "to": "market", "type": "energy"},
+    {"from": "market", "to": "grass", "type": "money_feedback"}
+  ]
+}

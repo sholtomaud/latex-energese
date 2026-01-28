@@ -1,0 +1,51 @@
+\documentclass{standalone}
+\usepackage{tikz}
+\usepackage{energese}
+
+\begin{document}
+
+\begin{tikzpicture}
+    % Test 1: Source shape with all anchors
+    \node[energese source] (src) at (0,0) {Sun};
+    \draw[red, thick] (src.energy_out) circle (2pt);
+    \draw[blue, thick] (src.heat_sink) circle (2pt);
+
+    % Test 2: Producer shape
+    \node[energese producer] (prod) at (3,0) {Tree};
+    \draw[red, thick] (prod.energy_in) circle (2pt);
+    \draw[red, thick] (prod.energy_out) circle (2pt);
+    \draw[blue, thick] (prod.heat_sink) circle (2pt);
+
+    % Test 3: Consumer shape
+    \node[energese consumer] (cons) at (6,0) {Cow};
+    \draw[red, thick] (cons.energy_in) circle (2pt);
+    \draw[green, thick] (cons.feedback_out) circle (2pt);
+    \draw[blue, thick] (cons.heat_sink) circle (2pt);
+
+    % Test 4: Storage shape
+    \node[energese storage] (stor) at (0,-3) {Biomass};
+    \draw[red, thick] (stor.energy_in) circle (2pt);
+    \draw[red, thick] (stor.energy_out) circle (2pt);
+    \draw[blue, thick] (stor.heat_sink) circle (2pt);
+
+    % Test 5: Transaction shape
+    \node[energese transaction] (trans) at (3,-3) {Market};
+    \draw[red, thick] (trans.energy_in) circle (2pt);
+    \draw[green, thick] (trans.feedback_out) circle (2pt);
+    \draw[blue, thick] (trans.heat_sink) circle (2pt);
+
+    % Test 6: Interaction shape
+    \node[energese interaction] (inter) at (6,-3) {Valve};
+    \draw[red, thick] (inter.energy_in) circle (2pt);
+    \draw[red, thick] (inter.energy_out) circle (2pt);
+
+    % Labels for visual inspection
+    \node[below=8mm of src] {\tiny Source};
+    \node[below=8mm of prod] {\tiny Producer};
+    \node[below=8mm of cons] {\tiny Consumer};
+    \node[below=8mm of stor] {\tiny Storage};
+    \node[below=8mm of trans] {\tiny Transaction};
+    \node[below=8mm of inter] {\tiny Interaction};
+\end{tikzpicture}
+
+\end{document}
