@@ -1,0 +1,12 @@
+{
+  "nodes": [
+    {"id": "P1", "type": "producer", "Tr": 100, "label": "Factory"},
+    {"id": "C1", "type": "consumer", "Tr": 5000, "label": "Market"},
+    {"id": "T1", "type": "transaction", "Tr": 10000, "label": "Bank"}
+  ],
+  "edges": [
+    {"from": "P1", "to": "C1", "type": "energy"},
+    {"from": "C1", "to": "T1", "type": "energy"},
+    {"from": "T1", "to": "P1", "type": "money_feedback"}
+  ]
+}

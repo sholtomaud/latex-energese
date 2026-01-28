@@ -1,0 +1,27 @@
+\documentclass{standalone}
+\usepackage{energese}
+
+\begin{document}
+
+% We'll use a direct Lua call to test rendering without a JSON file for simplicity in this test
+\begin{luacode*}
+    local data = {
+        nodes = {
+            {id="A", type="source", Tr=1, label="A"},
+            {id="B", type="producer", Tr=100, label="B"},
+            {id="C", type="producer", Tr=100, label="C"},
+            {id="D", type="transaction", Tr=1000, label="D"},
+            {id="K", type="interaction", Tr=50, label="K"},
+            {id="L", type="consumer", Tr=200, label="L"}
+        },
+        edges = {
+            {from="A", to="B", type="energy"},
+            {from="B", to="D", type="energy"},
+            {from="D", to="B", type="money_feedback"},
+            {from="K", to="L", type="information"}
+        }
+    }
+    energese.render(data, "")
+\end{luacode*}
+
+\end{document}

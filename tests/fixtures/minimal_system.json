@@ -1,0 +1,11 @@
+{
+  "nodes": [
+    {"id": "S1", "type": "source", "Tr": 1, "label": "Sun"},
+    {"id": "P1", "type": "producer", "Tr": 100, "label": "Grass"},
+    {"id": "C1", "type": "consumer", "Tr": 2000, "label": "Cow"}
+  ],
+  "edges": [
+    {"from": "S1", "to": "P1", "type": "energy"},
+    {"from": "P1", "to": "C1", "type": "energy"}
+  ]
+}

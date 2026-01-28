@@ -1,0 +1,24 @@
+\documentclass{standalone}
+\usepackage{energese}
+
+\begin{document}
+
+\begin{luacode*}
+    local data = {
+        nodes = {
+            {id="S", type="source", Tr=1, label="Sun"},
+            {id="P", type="producer", Tr=100, label="Plant"},
+            {id="C", type="consumer", Tr=2000, label="Animal"}
+        },
+        edges = {
+            {from="S", to="P", type="energy"},
+            {from="P", to="C", type="energy"}
+        },
+        metadata = {
+            show_heat_sink = true
+        }
+    }
+    energese.render(data, "")
+\end{luacode*}
+
+\end{document}

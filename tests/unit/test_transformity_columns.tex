@@ -1,0 +1,72 @@
+\documentclass{article}
+\usepackage{luacode}
+
+\begin{luacode*}
+    package.path = package.path .. ";./?.lua"
+    energese = require("energese-core")
+\end{luacode*}
+
+\begin{document}
+
+\begin{luacode*}
+    -- Test 1: Three distinct transformities
+    local nodes1 = {
+        {id="A", Tr=1},
+        {id="B", Tr=100},
+        {id="C", Tr=10000}
+    }
+
+    local tr_map = energese.calculate_transformity_columns(nodes1)
+    assert(tr_map[1] == 1, "Test 1 Failed: Tr=1 should map to column 1")
+    assert(tr_map[100] == 2, "Test 1 Failed: Tr=100 should map to column 2")
+    assert(tr_map[10000] == 3, "Test 1 Failed: Tr=10000 should map to column 3")
+    texio.write_nl("v Test 1 PASSED: Three distinct columns")
+
+    -- Test 2: Duplicate transformities (same column)
+    local nodes2 = {
+        {id="A", Tr=100},
+        {id="B", Tr=100},
+        {id="C", Tr=1000}
+    }
+
+    local tr_map2 = energese.calculate_transformity_columns(nodes2)
+    assert(tr_map2[100] == 1, "Test 2 Failed: Tr=100 should map to column 1")
+    assert(tr_map2[1000] == 2, "Test 2 Failed: Tr=1000 should map to column 2")
+    -- Should only have 2 columns
+    local col_count = 0
+    for _ in pairs(tr_map2) do col_count = col_count + 1 end
+    assert(col_count == 2, "Test 2 Failed: Should have exactly 2 columns")
+    texio.write_nl("v Test 2 PASSED: Duplicate Tr values share column")
+
+    -- Test 3: Out-of-order input
+    local nodes3 = {
+        {id="A", Tr=1000},
+        {id="B", Tr=1},
+        {id="C", Tr=100}
+    }
+
+    local tr_map3 = energese.calculate_transformity_columns(nodes3)
+    assert(tr_map3[1] == 1, "Test 3 Failed: Lowest Tr should be column 1")
+    assert(tr_map3[100] == 2, "Test 3 Failed: Middle Tr should be column 2")
+    assert(tr_map3[1000] == 3, "Test 3 Failed: Highest Tr should be column 3")
+    texio.write_nl("v Test 3 PASSED: Input order doesn't affect column assignment")
+
+    -- Test 4: X-coordinate calculation
+    local x_coords = energese.calculate_x_coordinates(nodes3, tr_map3, 3.0)
+    assert(math.abs(x_coords["A"] - 9.0) < 0.01, "Test 4 Failed: Node A should be at x=9")
+    assert(math.abs(x_coords["B"] - 3.0) < 0.01, "Test 4 Failed: Node B should be at x=3")
+    assert(math.abs(x_coords["C"] - 6.0) < 0.01, "Test 4 Failed: Node C should be at x=6")
+    texio.write_nl("v Test 4 PASSED: X-coordinates calculated correctly")
+
+    -- Test 5: Single node
+    local nodes5 = {{id="A", Tr=42}}
+    local tr_map5 = energese.calculate_transformity_columns(nodes5)
+    assert(tr_map5[42] == 1, "Test 5 Failed: Single node should be in column 1")
+    texio.write_nl("v Test 5 PASSED: Single node edge case")
+
+    texio.write_nl("\n" .. string.rep("=", 50))
+    texio.write_nl("ALL TRANSFORMITY COLUMN TESTS PASSED")
+    texio.write_nl(string.rep("=", 50))
+\end{luacode*}
+
+\end{document}

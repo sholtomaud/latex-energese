@@ -1,0 +1,109 @@
+\documentclass{article}
+\usepackage{luacode}
+
+\begin{luacode*}
+    package.path = package.path .. ";./?.lua"
+    energese = require("energese-core")
+\end{luacode*}
+
+\begin{document}
+
+\begin{luacode*}
+    -- Test 1: Simple chain (all nodes on centerline)
+    local nodes1 = {
+        {id="A", Tr=1, type="source"},
+        {id="B", Tr=100, type="producer"},
+        {id="C", Tr=1000, type="consumer"}
+    }
+    local edges1 = {
+        {from="A", to="B", type="energy"},
+        {from="B", to="C", type="energy"}
+    }
+    local tr_map1 = { [1]=1, [100]=2, [1000]=3 }
+
+    local y_coords = energese.calculate_vertical_positions(nodes1, edges1, tr_map1, 1.5)
+    assert(math.abs(y_coords["A"]) < 0.01, "Test 1 Failed: A should be at y=0")
+    assert(math.abs(y_coords["B"]) < 0.01, "Test 1 Failed: B should be at y=0")
+    assert(math.abs(y_coords["C"]) < 0.01, "Test 1 Failed: C should be at y=0")
+    texio.write_nl("v Test 1 PASSED: Simple chain on centerline")
+
+    -- Test 2: Branching (parallel nodes offset vertically)
+    local nodes2 = {
+        {id="S", Tr=1, type="source"},
+        {id="P1", Tr=100, type="producer"},
+        {id="P2", Tr=100, type="producer"},
+        {id="C", Tr=1000, type="consumer"}
+    }
+    local edges2 = {
+        {from="S", to="P1", type="energy"},
+        {from="S", to="P2", type="energy"},
+        {from="P1", to="C", type="energy"},
+        {from="P2", to="C", type="energy"}
+    }
+    local tr_map2 = { [1]=1, [100]=2, [1000]=3 }
+
+    local y_coords2 = energese.calculate_vertical_positions(nodes2, edges2, tr_map2, 1.5)
+    assert(math.abs(y_coords2["P1"] - y_coords2["P2"]) > 0.5,
+           "Test 2 Failed: Parallel nodes should be vertically separated")
+    local y_product = y_coords2["P1"] * y_coords2["P2"]
+    assert(y_product <= 0, "Test 2 Failed: Parallel nodes should be symmetric about y=0")
+    texio.write_nl("v Test 2 PASSED: Branching creates vertical offset")
+
+    -- Test 3: Layer hints respected
+    local nodes3 = {
+        {id="A", Tr=100, type="producer", layer_hint="main"},
+        {id="B", Tr=100, type="transaction", layer_hint="control"},
+        {id="C", Tr=100, type="consumer", layer_hint="decomposition"}
+    }
+    local edges3 = {}
+    local tr_map3 = { [100]=1 }
+
+    local y_coords3 = energese.calculate_vertical_positions(nodes3, edges3, tr_map3, 1.5)
+    assert(y_coords3["B"] > y_coords3["A"],
+           "Test 3 Failed: Control layer should be above main. B=" .. y_coords3["B"] .. ", A=" .. y_coords3["A"])
+    assert(y_coords3["C"] < y_coords3["A"],
+           "Test 3 Failed: Decomposition layer should be below main. C=" .. y_coords3["C"] .. ", A=" .. y_coords3["A"])
+    texio.write_nl("v Test 3 PASSED: Layer hints affect positioning")
+
+    -- Test 4: y_gravity parameter works
+    local nodes4 = {
+        {id="A", Tr=100, type="producer", y_gravity=2.0}
+    }
+    local edges4 = {}
+    local tr_map4 = { [100]=1 }
+
+    local y_coords4 = energese.calculate_vertical_positions(nodes4, edges4, tr_map4, 1.5)
+    assert(math.abs(y_coords4["A"] - 2.0) < 0.01,
+           "Test 4 Failed: y_gravity should shift node upward. A=" .. y_coords4["A"])
+    texio.write_nl("v Test 4 PASSED: Manual y_gravity override works")
+
+    -- Test 5: Main chain detection (longest path)
+    local nodes5 = {
+        {id="A", Tr=1, type="source"},
+        {id="B", Tr=10, type="producer"},
+        {id="C", Tr=100, type="consumer"},
+        {id="D", Tr=1000, type="consumer"},
+        {id="E", Tr=50, type="storage"}
+    }
+    local edges5 = {
+        {from="A", to="B", type="energy"},
+        {from="B", to="C", type="energy"},
+        {from="C", to="D", type="energy"},
+        {from="B", to="E", type="energy"}
+    }
+    local tr_map5 = { [1]=1, [10]=2, [50]=3, [100]=4, [1000]=5 }
+
+    local y_coords5 = energese.calculate_vertical_positions(nodes5, edges5, tr_map5, 1.5)
+    assert(math.abs(y_coords5["A"]) < 0.01, "Test 5: A should be on main chain")
+    assert(math.abs(y_coords5["B"]) < 0.01, "Test 5: B should be on main chain")
+    assert(math.abs(y_coords5["C"]) < 0.01, "Test 5: C should be on main chain")
+    assert(math.abs(y_coords5["D"]) < 0.01, "Test 5: D should be on main chain")
+    assert(math.abs(y_coords5["E"]) > 0.5, "Test 5: E should be offset from main chain. E=" .. y_coords5["E"])
+    texio.write_nl("v Test 5 PASSED: Main chain detection works")
+
+    texio.write_nl("\n" .. string.rep("=", 50))
+    texio.write_nl("ALL VERTICAL POSITIONING TESTS PASSED")
+    texio.write_nl(string.rep("=", 50))
+\end{luacode*}
+
+\end{document}

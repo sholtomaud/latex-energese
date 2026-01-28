@@ -1,0 +1,32 @@
+{
+  "metadata": {
+    "name": "Regional Industrial System",
+    "show_grid": false,
+    "show_axis": true
+  },
+  "nodes": [
+    {"id": "sun", "type": "source", "Tr": 1, "label": "Solar"},
+    {"id": "wind", "type": "source", "Tr": 1, "label": "Wind"},
+    {"id": "forest", "type": "producer", "Tr": 100, "label": "Forest", "layer_hint": "main"},
+    {"id": "crops", "type": "producer", "Tr": 150, "label": "Agriculture"},
+    {"id": "sawmill", "type": "consumer", "Tr": 2000, "label": "Sawmill"},
+    {"id": "food_proc", "type": "consumer", "Tr": 2500, "label": "Food Processing"},
+    {"id": "city", "type": "consumer", "Tr": 10000, "label": "City"},
+    {"id": "economy", "type": "transaction", "Tr": 50000, "label": "Economy", "layer_hint": "control"},
+    {"id": "waste", "type": "storage", "Tr": 50, "label": "Waste", "layer_hint": "decomposition"}
+  ],
+  "edges": [
+    {"from": "sun", "to": "forest", "type": "energy"},
+    {"from": "sun", "to": "crops", "type": "energy"},
+    {"from": "wind", "to": "city", "type": "energy"},
+    {"from": "forest", "to": "sawmill", "type": "energy"},
+    {"from": "crops", "to": "food_proc", "type": "energy"},
+    {"from": "sawmill", "to": "city", "type": "energy"},
+    {"from": "food_proc", "to": "city", "type": "energy"},
+    {"from": "city", "to": "economy", "type": "energy"},
+    {"from": "economy", "to": "forest", "type": "money_feedback"},
+    {"from": "economy", "to": "crops", "type": "money_feedback"},
+    {"from": "city", "to": "waste", "type": "material"},
+    {"from": "waste", "to": "forest", "type": "material"}
+  ]
+}

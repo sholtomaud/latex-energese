@@ -1,0 +1,48 @@
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{energese}[2026/01/28 Energese ESL Diagram Package]
+
+\RequirePackage{tikz}
+\usetikzlibrary{positioning, arrows.meta, shapes.geometric}
+\RequirePackage{luacode}
+\RequirePackage{environ}
+
+% Load PGF shapes
+\input{energese-shapes.tex}
+
+% TikZ Styles
+\tikzset{
+    energese source/.style={draw, shape=energese source, minimum size=0.8cm},
+    energese producer/.style={draw, shape=energese producer, minimum size=1cm},
+    energese consumer/.style={draw, shape=energese consumer, minimum size=1cm},
+    energese storage/.style={draw, shape=energese storage, minimum size=0.8cm},
+    energese interaction/.style={draw, shape=energese interaction, minimum size=1cm},
+    energese transaction/.style={draw, shape=energese transaction, minimum size=1cm},
+    % Edge styles
+    energese energy/.style={->, thick, solid},
+    energese material/.style={->, thick, solid},
+    energese money_feedback/.style={->, dashed, blue, out=90, in=90, looseness=1.5},
+    energese information/.style={->, thin, solid},
+    energese heat/.style={draw, thin, dashed, gray}
+}
+
+\begin{luacode*}
+    package.path = package.path .. ";./?.lua"
+    energese = require("energese-core")
+\end{luacode*}
+
+\newcommand{\renderEnergese}[2][]{
+    \directlua{
+        local data = energese.parse_json_file([[#2]])
+        energese.render(data, [[#1]])
+    }
+}
+
+\NewEnviron{energeseData}[1][]{
+    \directlua{
+        local data = energese.parse_json(\energeseWrapLua{\BODY})
+        energese.render(data, [[#1]])
+    }
+}
+
+% Helper to wrap content in Lua long brackets to handle special characters safely
+\newcommand{\energeseWrapLua}[1]{[===[#1]===]}

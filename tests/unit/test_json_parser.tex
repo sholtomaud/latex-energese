@@ -1,0 +1,96 @@
+\documentclass{article}
+\usepackage{luacode}
+
+\begin{luacode*}
+    -- Add current directory to package path so require works
+    package.path = package.path .. ";./?.lua"
+    energese = require("energese-core")
+\end{luacode*}
+
+\begin{document}
+
+\begin{luacode*}
+    -- Test 1: Valid minimal JSON
+    local test1_json = [[
+    {
+        "nodes": [
+            {"id": "A", "type": "source", "Tr": 1, "label": "Test"}
+        ],
+        "edges": []
+    }
+    ]]
+
+    local result = energese.parse_json(test1_json)
+    assert(result ~= nil, "Test 1 Failed: Valid JSON should parse")
+    assert(#result.nodes == 1, "Test 1 Failed: Should have 1 node")
+    assert(result.nodes[1].id == "A", "Test 1 Failed: Node ID should be 'A'")
+    texio.write_nl("v Test 1 PASSED: Valid minimal JSON")
+
+    -- Test 2: Invalid JSON (missing comma)
+    local test2_json = [[
+    {
+        "nodes": [
+            {"id": "A" "type": "source"}
+        ]
+    }
+    ]]
+
+    local success = pcall(function() energese.parse_json(test2_json) end)
+    assert(not success, "Test 2 Failed: Invalid JSON should raise error")
+    texio.write_nl("v Test 2 PASSED: Invalid JSON rejected")
+
+    -- Test 3: Missing required field
+    local test3_json = [[
+    {
+        "nodes": [
+            {"id": "A", "type": "source"}
+        ],
+        "edges": []
+    }
+    ]]
+
+    local result3 = energese.parse_json(test3_json)
+    local ok3, err3 = energese.validate_schema(result3)
+    assert(ok3 == false, "Test 3 Failed: Should fail validation")
+    assert(string.match(err3, "Tr"), "Test 3 Failed: Error should mention missing Tr: " .. tostring(err3))
+    texio.write_nl("v Test 3 PASSED: Schema validation catches missing field")
+
+    -- Test 4: Invalid node type
+    local test4_json = [[
+    {
+        "nodes": [
+            {"id": "A", "type": "invalid_type", "Tr": 1, "label": "Test"}
+        ],
+        "edges": []
+    }
+    ]]
+
+    local result4 = energese.parse_json(test4_json)
+    local ok4, err4 = energese.validate_schema(result4)
+    assert(ok4 == false, "Test 4 Failed: Should reject invalid node type")
+    texio.write_nl("v Test 4 PASSED: Invalid node type rejected")
+
+    -- Test 5: Edge references non-existent node
+    local test5_json = [[
+    {
+        "nodes": [
+            {"id": "A", "type": "source", "Tr": 1, "label": "Test"}
+        ],
+        "edges": [
+            {"from": "A", "to": "B", "type": "energy"}
+        ]
+    }
+    ]]
+
+    local result5 = energese.parse_json(test5_json)
+    local ok5, err5 = energese.validate_schema(result5)
+    assert(ok5 == false, "Test 5 Failed: Should catch dangling edge reference")
+    assert(string.match(err5, "B"), "Test 5 Failed: Error should mention node 'B': " .. tostring(err5))
+    texio.write_nl("v Test 5 PASSED: Dangling edge reference caught")
+
+    texio.write_nl("\n" .. string.rep("=", 50))
+    texio.write_nl("ALL JSON PARSER TESTS PASSED")
+    texio.write_nl(string.rep("=", 50))
+\end{luacode*}
+
+\end{document}
