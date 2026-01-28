@@ -1,0 +1,24 @@
+name: Test Energese Package
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install LaTeX dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y texlive-luatex texlive-latex-base texlive-latex-extra
+
+    - name: Run tests
+      run: |
+        chmod +x tests/run_tests.sh
+        ./tests/run_tests.sh all

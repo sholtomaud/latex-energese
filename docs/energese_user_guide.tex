@@ -1,0 +1,61 @@
+\documentclass{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{energese}
+\usepackage{hyperref}
+
+\title{The \texttt{energese} Package User Guide}
+\author{Jules}
+\date{January 2026}
+
+\begin{document}
+
+\maketitle
+
+\section{Introduction}
+The \texttt{energese} package automates the rendering of H.T. Odum's Energy Systems Language (ESL) diagrams using a data-driven approach via LuaLaTeX and TikZ.
+
+\section{Quick Start}
+To use the package, you need to provide a JSON file describing your system.
+
+\subsection{Example System}
+Here is a simple ESL diagram rendered from a JSON file.
+
+\begin{center}
+\renderEnergese{examples/simple_system.json}
+\end{center}
+
+\subsection{JSON Structure}
+The JSON file should contain \texttt{nodes} and \texttt{edges}. Each node must have a \texttt{Tr} (Transformity) value, which determines its horizontal position.
+
+\begin{verbatim}
+{
+  "nodes": [
+    {"id": "sun", "type": "source", "Tr": 1, "label": "Sun"},
+    {"id": "grass", "type": "producer", "Tr": 100, "label": "Grass"}
+  ],
+  "edges": [
+    {"from": "sun", "to": "grass", "type": "energy"}
+  ]
+}
+\end{verbatim}
+
+\section{Node Types}
+The package supports several node types:
+\begin{itemize}
+    \item \texttt{source}: Circle
+    \item \texttt{producer}: Lung shape
+    \item \texttt{consumer}: Hexagon
+    \item \texttt{storage}: Tank
+    \item \texttt{interaction}: Pointed block
+    \item \texttt{transaction}: Diamond
+\end{itemize}
+
+\section{Edge Types}
+\begin{itemize}
+    \item \texttt{energy}: Solid line with arrow
+    \item \texttt{money\_feedback}: Dashed blue overhead arc
+    \item \texttt{information}: Thin solid line
+    \item \texttt{material}: Solid line
+\end{itemize}
+
+\end{document}
