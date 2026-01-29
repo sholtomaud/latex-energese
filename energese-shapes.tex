@@ -7,9 +7,10 @@
     \anchor{east}{\pgfpoint{\energeseradius}{0pt}}
     \anchor{west}{\pgfpoint{-\energeseradius}{0pt}}
     \anchor{energy_out}{\pgfpoint{\energeseradius}{0pt}}
+    \anchor{money_in}{\pgfpoint{\energeseradius}{0.1cm}}
+    \anchor{money_out}{\pgfpoint{\energeseradius}{0.1cm}}
     \anchor{feedback_in}{\pgfpoint{0pt}{\energeseradius}}
     \anchor{heat_sink}{\pgfpoint{0pt}{-\energeseradius}}
-
     \backgroundpath{
         \pgfpathcircle{\centerpoint}{\energeseradius}
     }
@@ -17,126 +18,161 @@
 
 \pgfdeclareshape{energese producer}{
     \savedanchor\centerpoint{\pgfpointorigin}
-    \saveddimen\halfwidth{\pgf@x=0.5cm}
+    \saveddimen\halfwidth{\pgf@x=0.7cm}
     \saveddimen\halfheight{\pgf@x=0.4cm}
-
     \anchor{center}{\centerpoint}
     \anchor{north}{\pgfpoint{0pt}{\halfheight}}
     \anchor{south}{\pgfpoint{0pt}{-\halfheight}}
     \anchor{east}{\pgfpoint{\halfwidth}{0pt}}
     \anchor{west}{\pgfpoint{-\halfwidth}{0pt}}
-    \anchor{energy_in}{\pgfpoint{-\halfwidth}{0pt}}
-    \anchor{energy_out}{\pgfpoint{\halfwidth}{0pt}}
-    \anchor{feedback_in}{\pgfpoint{-0.25cm}{\halfheight}}
-    \anchor{feedback_out}{\pgfpoint{0.25cm}{\halfheight}}
+    \anchor{energy_in}{\pgfpoint{-\halfwidth}{-0.05cm}}
+    \anchor{energy_out}{\pgfpoint{\halfwidth}{-0.05cm}}
+    \anchor{money_in}{\pgfpoint{\halfwidth}{0.1cm}}
+    \anchor{money_out}{\pgfpoint{-\halfwidth}{0.1cm}}
+    \anchor{feedback_in}{\pgfpoint{0.2cm}{\halfheight}}
+    \anchor{feedback_out}{\pgfpoint{-0.2cm}{\halfheight}}
     \anchor{heat_sink}{\pgfpoint{0pt}{-\halfheight}}
-
     \backgroundpath{
-        \pgfpathmoveto{\pgfpoint{\halfwidth}{0pt}}
-        \pgfpathcurveto{\pgfpoint{\halfwidth}{\halfheight}}{\pgfpoint{0pt}{\halfheight}}{\pgfpoint{0pt}{\halfheight}}
-        \pgfpathcurveto{\pgfpoint{-\halfwidth}{\halfheight}}{\pgfpoint{-\halfwidth}{0pt}}{\pgfpoint{-\halfwidth}{0pt}}
-        \pgfpathcurveto{\pgfpoint{-\halfwidth}{-\halfheight}}{\pgfpoint{0pt}{-\halfheight}}{\pgfpoint{0pt}{-\halfheight}}
-        \pgfpathcurveto{\pgfpoint{0pt}{-\halfheight}}{\pgfpoint{\halfwidth}{-\halfheight}}{\pgfpoint{\halfwidth}{0pt}}
+        \pgfmathsetmacro{\hw}{\halfwidth}
+        \pgfmathsetmacro{\hh}{\halfheight}
+        \pgfmathsetmacro{\qw}{0.3*\hw}
+        \pgfpathmoveto{\pgfpoint{-\hw pt}{0pt}}
+        \pgfpathcurveto{\pgfpoint{-\hw pt}{\hh pt}}{\pgfpoint{-\qw pt}{\hh pt}}{\pgfpoint{0pt}{\hh pt}}
+        \pgfpathlineto{\pgfpoint{\qw pt}{\hh pt}}
+        \pgfpathlineto{\pgfpoint{\hw pt}{0pt}}
+        \pgfpathlineto{\pgfpoint{\qw pt}{-\hh pt}}
+        \pgfpathlineto{\pgfpoint{0pt}{-\hh pt}}
+        \pgfpathcurveto{\pgfpoint{-\qw pt}{-\hh pt}}{\pgfpoint{-\hw pt}{-\hh pt}}{\pgfpoint{-\hw pt}{0pt}}
         \pgfpathclose
+    }
+}
+
+\pgfdeclareshape{energese ground}{
+    \savedanchor\centerpoint{\pgfpointorigin}
+    \anchor{center}{\centerpoint}
+    \anchor{north}{\pgfpoint{0pt}{0pt}}
+    \anchor{south}{\pgfpoint{0pt}{-0.3cm}}
+    \backgroundpath{
+        \pgfpathmoveto{\pgfpoint{0pt}{0pt}}
+        \pgfpathlineto{\pgfpoint{0pt}{-0.1cm}}
+        \pgfpathmoveto{\pgfpoint{-0.2cm}{-0.1cm}}
+        \pgfpathlineto{\pgfpoint{0.2cm}{-0.1cm}}
+        \pgfpathmoveto{\pgfpoint{-0.1cm}{-0.17cm}}
+        \pgfpathlineto{\pgfpoint{0.1cm}{-0.17cm}}
+        \pgfpathmoveto{\pgfpoint{-0.05cm}{-0.24cm}}
+        \pgfpathlineto{\pgfpoint{0.05cm}{-0.24cm}}
+        \pgfusepath{draw}
     }
 }
 
 \pgfdeclareshape{energese consumer}{
     \savedanchor\centerpoint{\pgfpointorigin}
     \saveddimen\halfwidth{\pgf@x=0.5cm}
-    \saveddimen\halfheight{\pgf@x=0.433cm}
-
+    \saveddimen\halfheight{\pgf@x=0.6cm}
     \anchor{center}{\centerpoint}
     \anchor{north}{\pgfpoint{0pt}{\halfheight}}
     \anchor{south}{\pgfpoint{0pt}{-\halfheight}}
     \anchor{east}{\pgfpoint{\halfwidth}{0pt}}
     \anchor{west}{\pgfpoint{-\halfwidth}{0pt}}
-    \anchor{energy_in}{\pgfpoint{-\halfwidth}{0pt}}
-    \anchor{energy_out}{\pgfpoint{\halfwidth}{0pt}}
-    \anchor{feedback_in}{\pgfpoint{-0.25cm}{\halfheight}}
-    \anchor{feedback_out}{\pgfpoint{0.25cm}{\halfheight}}
+    \anchor{energy_in}{\pgfmathsetmacro{\hw}{\halfwidth}\pgfpoint{-0.7*\hw pt}{-0.05cm}}
+    \anchor{energy_out}{\pgfmathsetmacro{\hw}{\halfwidth}\pgfmathsetmacro{\hh}{\halfheight}\pgfpoint{\hw pt}{0.2*\hh pt}}
+    \anchor{money_in}{\pgfmathsetmacro{\hw}{\halfwidth}\pgfmathsetmacro{\hh}{\halfheight}\pgfpoint{\hw pt}{0.4*\hh pt}}
+    \anchor{money_out}{\pgfmathsetmacro{\hw}{\halfwidth}\pgfpoint{-0.7*\hw pt}{0.1cm}}
+    \anchor{feedback_in}{\pgfpoint{0.2cm}{\halfheight}}
+    \anchor{feedback_out}{\pgfpoint{-0.2cm}{\halfheight}}
     \anchor{heat_sink}{\pgfpoint{0pt}{-\halfheight}}
-
     \backgroundpath{
-        \pgfpathmoveto{\pgfpoint{-\halfwidth}{0pt}}
-        \pgfpathlineto{\pgfpoint{-0.25cm}{\halfheight}}
-        \pgfpathlineto{\pgfpoint{0.25cm}{\halfheight}}
-        \pgfpathlineto{\pgfpoint{\halfwidth}{0pt}}
-        \pgfpathlineto{\pgfpoint{0.25cm}{-\halfheight}}
-        \pgfpathlineto{\pgfpoint{-0.25cm}{-\halfheight}}
+        \pgfmathsetmacro{\hw}{\halfwidth}
+        \pgfmathsetmacro{\hh}{\halfheight}
+        \pgfmathsetmacro{\thh}{0.3*\hh}
+        \pgfmathsetmacro{\shw}{0.7*\hw}
+        \pgfpathmoveto{\pgfpoint{0pt}{\hh pt}}
+        \pgfpathlineto{\pgfpoint{\hw pt}{\thh pt}}
+        \pgfpathlineto{\pgfpoint{\hw pt}{-\thh pt}}
+        \pgfpathlineto{\pgfpoint{0pt}{-\hh pt}}
+        \pgfpathlineto{\pgfpoint{-\hw pt}{-\thh pt}}
+        \pgfpathlineto{\pgfpoint{-\shw pt}{0pt}}
+        \pgfpathlineto{\pgfpoint{-\hw pt}{\thh pt}}
         \pgfpathclose
     }
 }
 
 \pgfdeclareshape{energese storage}{
     \savedanchor\centerpoint{\pgfpointorigin}
-    \saveddimen\halfwidth{\pgf@x=0.4cm}
-    \saveddimen\halfheight{\pgf@x=0.6cm}
-
+    \saveddimen\halfwidth{\pgf@x=0.5cm}
+    \saveddimen\halfheight{\pgf@x=0.5cm}
     \anchor{center}{\centerpoint}
     \anchor{north}{\pgfpoint{0pt}{\halfheight}}
-    \anchor{south}{\pgfpoint{0pt}{-\halfheight}}
+    \anchor{south}{\pgfpoint{0pt}{-0.45cm}}
     \anchor{east}{\pgfpoint{\halfwidth}{0pt}}
     \anchor{west}{\pgfpoint{-\halfwidth}{0pt}}
     \anchor{energy_in}{\pgfpoint{-\halfwidth}{0pt}}
     \anchor{energy_out}{\pgfpoint{\halfwidth}{0pt}}
-    \anchor{feedback_in}{\pgfpoint{0pt}{\halfheight}}
-    \anchor{heat_sink}{\pgfpoint{0pt}{-\halfheight}}
-
+    \anchor{money_in}{\pgfpoint{\halfwidth}{0.1cm}}
+    \anchor{money_out}{\pgfpoint{-\halfwidth}{0.1cm}}
+    \anchor{feedback_in}{\pgfpoint{0.2cm}{\halfheight}}
+    \anchor{feedback_out}{\pgfpoint{-0.2cm}{\halfheight}}
+    \anchor{heat_sink}{\pgfpoint{0pt}{-0.45cm}}
     \backgroundpath{
-        \pgfpathmoveto{\pgfpoint{-\halfwidth}{-\halfheight}}
-        \pgfpathlineto{\pgfpoint{\halfwidth}{-\halfheight}}
-        \pgfpathlineto{\pgfpoint{\halfwidth}{0.24cm}}
-        \pgfpathcurveto{\pgfpoint{\halfwidth}{\halfheight}}{\pgfpoint{-\halfwidth}{\halfheight}}{\pgfpoint{-\halfwidth}{0.24cm}}
+        \pgfmathsetmacro{\hw}{\halfwidth}
+        \pgfmathsetmacro{\hh}{\halfheight}
+        \pgfmathsetmacro{\basey}{0.2*\hh}
+        \pgfpathmoveto{\pgfpoint{-\hw pt}{\basey pt}}
+        \pgfpathlineto{\pgfpoint{0pt}{\hh pt}}
+        \pgfpathlineto{\pgfpoint{\hw pt}{\basey pt}}
+        \pgfpatharc{11.5}{-191.5}{\hw pt}
         \pgfpathclose
     }
 }
 
 \pgfdeclareshape{energese transaction}{
     \savedanchor\centerpoint{\pgfpointorigin}
-    \saveddimen\halfsize{\pgf@x=0.5cm}
-
+    \saveddimen\halfsize{\pgf@x=0.4cm}
     \anchor{center}{\centerpoint}
     \anchor{north}{\pgfpoint{0pt}{\halfsize}}
     \anchor{south}{\pgfpoint{0pt}{-\halfsize}}
     \anchor{east}{\pgfpoint{\halfsize}{0pt}}
     \anchor{west}{\pgfpoint{-\halfsize}{0pt}}
-    \anchor{energy_in}{\pgfpoint{-\halfsize}{0pt}}
-    \anchor{energy_out}{\pgfpoint{\halfsize}{0pt}}
-    \anchor{feedback_in}{\pgfpoint{-0.25cm}{0.25cm}}
-    \anchor{feedback_out}{\pgfpoint{0.25cm}{0.25cm}}
+    \anchor{energy_in}{\pgfpoint{-\halfsize}{-0.1cm}}
+    \anchor{energy_out}{\pgfpoint{\halfsize}{-0.1cm}}
+    \anchor{money_in}{\pgfpoint{\halfsize}{0.1cm}}
+    \anchor{money_out}{\pgfpoint{-\halfsize}{0.1cm}}
+    \anchor{feedback_in}{\pgfpoint{\halfsize}{0.15cm}}
+    \anchor{feedback_out}{\pgfpoint{-\halfsize}{0.15cm}}
     \anchor{heat_sink}{\pgfpoint{0pt}{-\halfsize}}
-
     \backgroundpath{
-        \pgfpathmoveto{\pgfpoint{0pt}{\halfsize}}
-        \pgfpathlineto{\pgfpoint{\halfsize}{0pt}}
-        \pgfpathlineto{\pgfpoint{0pt}{-\halfsize}}
-        \pgfpathlineto{\pgfpoint{-\halfsize}{0pt}}
+        \pgfmathsetmacro{\hs}{\halfsize}
+        \pgfpathmoveto{\pgfpoint{0pt}{\hs pt}}
+        \pgfpathlineto{\pgfpoint{\hs pt}{0pt}}
+        \pgfpathlineto{\pgfpoint{0pt}{-\hs pt}}
+        \pgfpathlineto{\pgfpoint{-\hs pt}{0pt}}
         \pgfpathclose
     }
 }
 
 \pgfdeclareshape{energese interaction}{
     \savedanchor\centerpoint{\pgfpointorigin}
-    \saveddimen\halfwidth{\pgf@x=0.6cm}
-    \saveddimen\halfheight{\pgf@x=0.3cm}
-
+    \saveddimen\halfwidth{\pgf@x=0.5cm}
+    \saveddimen\halfheight{\pgf@x=0.4cm}
     \anchor{center}{\centerpoint}
     \anchor{north}{\pgfpoint{0pt}{\halfheight}}
     \anchor{south}{\pgfpoint{0pt}{-\halfheight}}
     \anchor{east}{\pgfpoint{\halfwidth}{0pt}}
     \anchor{west}{\pgfpoint{-\halfwidth}{0pt}}
-    \anchor{energy_in}{\pgfpoint{-\halfwidth}{0pt}}
+    \anchor{energy_in}{\pgfmathsetmacro{\hw}{\halfwidth}\pgfpoint{-\hw pt}{0pt}}
     \anchor{energy_out}{\pgfpoint{\halfwidth}{0pt}}
+    \anchor{money_in}{\pgfpoint{\halfwidth}{0.1cm}}
+    \anchor{money_out}{\pgfpoint{-\halfwidth}{0.1cm}}
     \anchor{feedback_in}{\pgfpoint{0pt}{\halfheight}}
     \anchor{heat_sink}{\pgfpoint{0pt}{-\halfheight}}
-
     \backgroundpath{
-        \pgfpathmoveto{\pgfpoint{-\halfwidth}{\halfheight}}
-        \pgfpathlineto{\pgfpoint{0pt}{\halfheight}}
-        \pgfpathlineto{\pgfpoint{\halfwidth}{0pt}}
-        \pgfpathlineto{\pgfpoint{0pt}{-\halfheight}}
-        \pgfpathlineto{\pgfpoint{-\halfwidth}{-\halfheight}}
+        \pgfmathsetmacro{\hw}{\halfwidth}
+        \pgfmathsetmacro{\hh}{\halfheight}
+        \pgfpathmoveto{\pgfpoint{-\hw pt}{\hh pt}}
+        \pgfpathlineto{\pgfpoint{0pt}{\hh pt}}
+        \pgfpathlineto{\pgfpoint{\hw pt}{0pt}}
+        \pgfpathlineto{\pgfpoint{0pt}{-\hh pt}}
+        \pgfpathlineto{\pgfpoint{-\hw pt}{-\hh pt}}
         \pgfpathclose
     }
 }

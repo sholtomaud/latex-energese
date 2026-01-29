@@ -65,4 +65,26 @@ if [ "$PHASE" == "all" ] || [ "$PHASE" == "8" ]; then
     run_test_suite "tests/integration/test_inline_json"
 fi
 
+if [ "$PHASE" == "all" ] || [ "$PHASE" == "9" ]; then
+    suite="tests/integration/test_error_messages"
+    echo "=========================================="
+    echo "Running: $suite (expecting errors)"
+    echo "=========================================="
+    lualatex --interaction=nonstopmode --output-directory="tests/integration" "$suite.tex" > /dev/null 2>&1
+
+    # Check for expected error patterns in log
+    MISSING_ERRORS=0
+    grep "Module energese Error: File not found: nonexistent_file.json" "${suite}.log" > /dev/null || { echo "✗ Missing: File not found error"; MISSING_ERRORS=1; }
+    grep "Module energese Error: Invalid JSON syntax" "${suite}.log" > /dev/null || { echo "✗ Missing: Invalid JSON syntax error"; MISSING_ERRORS=1; }
+    grep "Node 'A' missing required field 'Tr'" "${suite}.log" > /dev/null || { echo "✗ Missing: Missing field Tr error"; MISSING_ERRORS=1; }
+    grep "Edge references undefined node 'B'" "${suite}.log" > /dev/null || { echo "✗ Missing: Undefined node error"; MISSING_ERRORS=1; }
+
+    if [ $MISSING_ERRORS -eq 0 ]; then
+        echo "✓ PASS: $suite (All expected errors caught)"
+    else
+        echo "✗ FAIL: $suite (Some expected errors were NOT caught)"
+        FAILED=1
+    fi
+fi
+
 exit $FAILED

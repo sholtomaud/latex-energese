@@ -1,0 +1,17 @@
+\documentclass{article}
+\usepackage{luacode}
+\begin{document}
+\begin{luacode*}
+    local path = kpse.find_file("energese-core.lua")
+    tex.print("Path: " .. tostring(path) .. "\\\\")
+    if path then
+        local dir = path:match("(.*)[/\\]")
+        tex.print("Dir: " .. tostring(dir) .. "\\\\")
+        local ok, res = pcall(dofile, path)
+        tex.print("Dofile OK: " .. tostring(ok) .. "\\\\")
+        if not ok then tex.print("Error: " .. tostring(res) .. "\\\\") end
+        _G.energese = res
+    end
+\end{luacode*}
+Test: \directlua{tex.print(tostring(_G.energese))}
+\end{document}

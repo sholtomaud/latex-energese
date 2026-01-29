@@ -2,34 +2,57 @@
 \ProvidesPackage{energese}[2026/01/28 Energese ESL Diagram Package]
 
 \RequirePackage{tikz}
-\usetikzlibrary{positioning, arrows.meta, shapes.geometric, calc}
+\usetikzlibrary{positioning, arrows.meta, shapes.geometric, calc, backgrounds}
 \RequirePackage{luacode}
 \RequirePackage{environ}
+\RequirePackage{fontspec}
+
+\setsansfont{TeX Gyre Heros Cn}
 
 % Load PGF shapes
 \input{energese-shapes.tex}
 
 % TikZ Styles
 \tikzset{
-    energese source/.style={draw, shape=energese source, minimum size=0.8cm, align=center},
-    energese producer/.style={draw, shape=energese producer, minimum size=1cm, align=center},
-    energese consumer/.style={draw, shape=energese consumer, minimum size=1cm, align=center},
-    energese storage/.style={draw, shape=energese storage, minimum size=0.8cm, align=center},
-    energese interaction/.style={draw, shape=energese interaction, minimum size=1cm, align=center},
-    energese transaction/.style={draw, shape=energese transaction, minimum size=1cm, align=center},
-    energese text/.style={align=center},
+    % Global arrow style
+    >={Stealth[length=3.5pt, width=2pt]},
+    % Node styles
+    energese source/.style={draw, shape=energese source, minimum size=0.8cm, align=center, fill=white, font=\sffamily},
+    energese producer/.style={draw, shape=energese producer, minimum size=1cm, align=center, fill=white, font=\sffamily},
+    energese consumer/.style={draw, shape=energese consumer, minimum size=1cm, align=center, fill=white, font=\sffamily},
+    energese storage/.style={draw, shape=energese storage, minimum size=0.8cm, align=center, fill=white, font=\sffamily},
+    energese interaction/.style={draw, shape=energese interaction, minimum size=1cm, align=center, fill=white, font=\sffamily},
+    energese transaction/.style={draw, shape=energese transaction, minimum size=1cm, align=center, fill=white, font=\sffamily},
+    energese ground/.style={draw=none, shape=energese ground, fill=none},
+    energese box/.style={draw, shape=rectangle, align=center, fill=white, font=\sffamily},
+    energese text/.style={align=center, font=\sffamily},
     % Edge styles
-    energese energy/.style={->, thick, solid},
-    energese material/.style={->, thick, solid},
-    energese money_feedback/.style={->, dashed, blue, out=90, in=90, looseness=1.5},
-    energese information/.style={->, thin, solid},
-    energese heat/.style={draw, thin, dashed, gray}
+    energese energy/.style={->, semithick, solid, black},
+    energese material/.style={->, semithick, solid, black},
+    energese money_feedback/.style={->, dashed, black, out=90, in=90, looseness=1.5},
+    energese information/.style={->, thin, solid, black},
+    energese heat/.style={draw, solid, black}
 }
 
 \begin{luacode*}
-    -- Add current directory to package path for manual runs
-    package.path = package.path .. ";./?.lua"
-    energese = require("energese-core")
+    -- Use kpse to find and preload dependencies
+    local function preload(name)
+        local path = kpse.find_file(name .. ".lua")
+        if path then
+            package.preload[name] = function() return dofile(path) end
+            return true
+        end
+        return false
+    end
+
+    preload("dkjson")
+
+    local core_path = kpse.find_file("energese-core.lua")
+    if core_path then
+        energese = dofile(core_path)
+    else
+        tex.error("Could not find energese-core.lua")
+    end
 \end{luacode*}
 
 \newcommand{\renderEnergese}[2][]{

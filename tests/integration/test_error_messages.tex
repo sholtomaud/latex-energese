@@ -1,0 +1,44 @@
+\documentclass{article}
+\usepackage{energese}
+
+\begin{document}
+
+\section{Test 1: File not found}
+\renderEnergese{nonexistent_file.json}
+% Expected: "Error: File 'nonexistent_file.json' not found"
+
+\section{Test 2: Malformed JSON}
+\begin{energeseData}
+{
+  "nodes": [
+    {"id": "A" "type": "source"}  % Missing comma
+  ]
+}
+\end{energeseData}
+% Expected: "Error: Invalid JSON syntax at line 3"
+
+\section{Test 3: Missing required field}
+\begin{energeseData}
+{
+  "nodes": [
+    {"id": "A", "type": "source", "label": "Test"}
+  ],
+  "edges": []
+}
+\end{energeseData}
+% Expected: "Error: Node 'A' missing required field 'Tr'"
+
+\section{Test 4: Invalid edge reference}
+\begin{energeseData}
+{
+  "nodes": [
+    {"id": "A", "type": "source", "Tr": 1, "label": "Test"}
+  ],
+  "edges": [
+    {"from": "A", "to": "B", "type": "energy"}
+  ]
+}
+\end{energeseData}
+% Expected: "Error: Edge references undefined node 'B'"
+
+\end{document}
