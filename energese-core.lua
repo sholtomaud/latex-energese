@@ -2,10 +2,18 @@ local dkjson = require("dkjson")
 
 local energese = {}
 
+local function report_error(msg)
+    if luatexbase and luatexbase.module_error then
+        luatexbase.module_error("energese", msg)
+    else
+        error("\n[energese error] " .. msg .. "\n")
+    end
+end
+
 function energese.parse_json(json_string)
     local data, pos, err = dkjson.decode(json_string, 1, nil)
     if err then
-        error("JSON parse error at " .. tostring(err))
+        report_error("Invalid JSON syntax: " .. tostring(err))
     end
     return data
 end
@@ -13,7 +21,7 @@ end
 function energese.parse_json_file(filepath)
     local f = io.open(filepath, "r")
     if not f then
-        error("Could not open file: " .. filepath)
+        report_error("File not found: " .. filepath)
     end
     local content = f:read("*all")
     f:close()
@@ -21,18 +29,18 @@ function energese.parse_json_file(filepath)
 end
 
 function energese.validate_node(node)
-    if not node.id then return false, "Node missing 'id'" end
-    if not node.type then return false, "Node '" .. node.id .. "' missing 'type'" end
+    if not node.id then return false, "Node missing required field 'id'" end
+    if not node.type then return false, "Node '" .. node.id .. "' missing required field 'type'" end
 
-    if node.type ~= "text" then
-        if not node.Tr then return false, "Node '" .. node.id .. "' missing 'Tr'" end
-        if not node.label then return false, "Node '" .. node.id .. "' missing 'label'" end
+    if node.type ~= "text" and node.type ~= "box" and node.type ~= "ground" then
+        if not node.Tr then return false, "Node '" .. node.id .. "' missing required field 'Tr' (Transformity)" end
+        if not node.label then return false, "Node '" .. node.id .. "' missing required field 'label'" end
     end
 
     local valid_types = {
         source = true, producer = true, consumer = true,
         storage = true, interaction = true, transaction = true,
-        text = true
+        text = true, box = true, ground = true
     }
     if not valid_types[node.type] then
         return false, "Node '" .. node.id .. "' has invalid type '" .. node.type .. "'"
@@ -264,7 +272,7 @@ end
 function energese.render(data, options)
     local ok, err = energese.validate_schema(data)
     if not ok then
-        error("Schema validation failed: " .. err)
+        report_error("Validation error: " .. err)
     end
 
     local tr_map = energese.calculate_transformity_columns(data.nodes)
@@ -274,31 +282,47 @@ function energese.render(data, options)
     local x_coords = energese.calculate_x_coordinates(data.nodes, tr_map, col_spacing)
     local y_coords = energese.calculate_vertical_positions(data.nodes, data.edges, tr_map, row_spacing)
 
+    local node_map = {}
+    for _, node in ipairs(data.nodes) do
+        node_map[node.id] = node
+    end
+
     tex.print("\\begin{tikzpicture}[" .. options .. "]")
 
-    -- Render nodes
+    -- 1. Create nodes first (invisible but defined for coordinates)
     for _, node in ipairs(data.nodes) do
         local x = x_coords[node.id]
         local y = y_coords[node.id]
         local magnitude = node.magnitude or 1.0
-        local label = node.label or ""
-        local style = string.format("energese %s, scale=%f", node.type, magnitude)
-        tex.print(string.format("\\node[%s] (%s) at (%f, %f) {%s};", style, node.id, x, y, label))
+        local style = string.format("energese %s, scale=%f, draw=none, fill=none", node.type, magnitude)
+        tex.print(string.format("\\node[%s] (%s) at (%f, %f) {};", style, node.id, x, y))
     end
 
-    -- Render edges
+    -- 2. Render edges
     for _, edge in ipairs(data.edges) do
         local from = edge.from
         local to = edge.to
         local etype = edge.type
         local volume = edge.volume or 1.0
 
+        local from_node = node_map[from]
+        local to_node = node_map[to]
+
         local from_anchor = "energy_out"
         local to_anchor = "energy_in"
 
+        if from_node and (from_node.type == "text" or from_node.type == "box") then
+            from_anchor = "center"
+        end
+        if to_node and (to_node.type == "text" or to_node.type == "box") then
+            to_anchor = "center"
+        elseif to_node and to_node.type == "ground" then
+            to_anchor = "north"
+        end
+
         if etype == "money_feedback" then
-            from_anchor = "feedback_out"
-            to_anchor = "feedback_in"
+            from_anchor = "money_out"
+            to_anchor = "money_in"
         elseif etype == "information" then
             to_anchor = "north"
         end
@@ -311,11 +335,23 @@ function energese.render(data, options)
         local options = edge.options or ""
         local label_code = ""
         if edge.label then
-            label_code = string.format("node[midway, sloped, above, inner sep=2pt] {%s}", edge.label)
+            local lopts = edge.label_options or "midway, sloped, above, inner sep=2pt"
+            label_code = string.format("node[%s] {%s}", lopts, edge.label)
         end
 
         tex.print(string.format("\\draw[%s] (%s.%s) to [%s] %s (%s.%s);",
             style, from, from_anchor, options, label_code, to, to_anchor))
+    end
+
+    -- 3. Render nodes properly (on top of edges)
+    for _, node in ipairs(data.nodes) do
+        local x = x_coords[node.id]
+        local y = y_coords[node.id]
+        local magnitude = node.magnitude or 1.0
+        local label = node.label or ""
+        local lopts = node.label_options or ""
+        local style = string.format("energese %s, scale=%f", node.type, magnitude)
+        tex.print(string.format("\\node[%s] (%s) at (%f, %f) %s {%s};", style, node.id, x, y, lopts ~= "" and "["..lopts.."]" or "", label))
     end
 
     -- Heat sinks
@@ -331,7 +367,7 @@ function energese.render(data, options)
         end
         local floor_y = (data.metadata and data.metadata.heat_sink_y) or (min_y - row_spacing)
 
-        tex.print(string.format("\\draw[energese heat] (%f, %f) -- (%f, %f);",
+        tex.print(string.format("\\draw[thick] (%f, %f) -- (%f, %f);",
             min_x - 1.0, floor_y, max_x + 1.0, floor_y))
 
         for _, node in ipairs(data.nodes) do
@@ -346,24 +382,46 @@ function energese.render(data, options)
         if data.metadata and data.metadata.ground_x then ground_x = data.metadata.ground_x end
 
         tex.print(string.format("\\node[inner sep=0pt, minimum size=0pt] (ground_point) at (%f, %f) {};", ground_x, floor_y))
-        tex.print(string.format("\\draw[energese heat] (ground_point.center) -- ++(0, -0.3);"))
-        tex.print(string.format("\\draw[energese heat] ([xshift=-0.2cm, yshift=-0.3cm]ground_point.center) -- ++(0.4, 0);"))
-        tex.print(string.format("\\draw[energese heat] ([xshift=-0.1cm, yshift=-0.4cm]ground_point.center) -- ++(0.2, 0);"))
-        tex.print(string.format("\\draw[energese heat] ([xshift=-0.05cm, yshift=-0.5cm]ground_point.center) -- ++(0.1, 0);"))
+        tex.print(string.format("\\draw[thick] (ground_point.center) -- ++(0, -0.3);"))
+        tex.print(string.format("\\draw[thick] ([xshift=-0.2cm, yshift=-0.3cm]ground_point.center) -- ++(0.4, 0);"))
+        tex.print(string.format("\\draw[thick] ([xshift=-0.1cm, yshift=-0.4cm]ground_point.center) -- ++(0.2, 0);"))
+        tex.print(string.format("\\draw[thick] ([xshift=-0.05cm, yshift=-0.5cm]ground_point.center) -- ++(0.1, 0);"))
 
-        if data.metadata and data.metadata.heat_sink_label then
-            tex.print(string.format("\\node[anchor=west] at ([xshift=0.3cm, yshift=-0.3cm]ground_point.center) {%s};", data.metadata.heat_sink_label))
-        end
+        local hs_label = (data.metadata and data.metadata.heat_sink_label) or "Environmental Floor"
+        tex.print(string.format("\\node[anchor=west] at ([xshift=0.3cm, yshift=-0.3cm]ground_point.center) {%s};", hs_label))
     end
 
     -- System Boundary
     if data.metadata and data.metadata.system_boundary then
-        local sb = data.metadata.system_boundary
-        tex.print(string.format("\\draw[thick] (%f, %f) rectangle (%f, %f);",
-            sb.x_min, sb.y_min, sb.x_max, sb.y_max))
-        if sb.label then
-            tex.print(string.format("\\node[anchor=north west] at (%f, %f) {%s};",
-                sb.x_min, sb.y_min, sb.label))
+        local boundaries = data.metadata.system_boundary
+        if boundaries == true then
+            -- Auto-calculate boundary
+            local min_x, max_x, min_y, max_y = 1000, -1000, 1000, -1000
+            for _, node in ipairs(data.nodes) do
+                local x, y = x_coords[node.id], y_coords[node.id]
+                if x < min_x then min_x = x end
+                if x > max_x then max_x = x end
+                if y < min_y then min_y = y end
+                if y > max_y then max_y = y end
+            end
+            boundaries = {{
+                x_min = min_x - col_spacing/2,
+                x_max = max_x + col_spacing/2,
+                y_min = min_y - row_spacing,
+                y_max = max_y + row_spacing
+            }}
+        elseif not boundaries[1] then
+            boundaries = {boundaries}
+        end
+
+        for _, sb in ipairs(boundaries) do
+            local style = sb.style or "thick"
+            tex.print(string.format("\\draw[%s] (%f, %f) rectangle (%f, %f);",
+                style, sb.x_min, sb.y_min, sb.x_max, sb.y_max))
+            if sb.label then
+                tex.print(string.format("\\node[anchor=north west] at (%f, %f) {%s};",
+                    sb.x_min, sb.y_max, sb.label))
+            end
         end
     end
 
