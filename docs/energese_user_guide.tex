@@ -1,61 +1,719 @@
 \documentclass{article}
 \usepackage[margin=1in]{geometry}
 \usepackage{energese}
+\usepackage{booktabs}
 \usepackage{hyperref}
 
 \title{The \texttt{energese} Package User Guide}
-\author{Jules}
-\date{January 2026}
+\date{}
 
 \begin{document}
 
 \maketitle
 
 \section{Introduction}
-The \texttt{energese} package automates the rendering of H.T. Odum's Energy Systems Language (ESL) diagrams using a data-driven approach via LuaLaTeX and TikZ.
 
-\section{Quick Start}
-To use the package, you need to provide a JSON file describing your system.
+\texttt{energese} renders H.T.\ Odum's Energy Systems Language (ESL) diagrams
+from a description of the system rather than from drawing commands. You state
+what the components are and how energy moves between them; the package places
+them and draws the result.
 
-\subsection{Example System}
-Here is a simple ESL diagram rendered from a JSON file.
+A system is described by three things: \emph{nodes} (the components), \emph{edges}
+(the pathways between them) and \emph{metadata} (diagram-wide settings). That
+description can be written as JSON or directly in \TeX. Both are parsed into the
+same model and rendered by the same code, so the two are interchangeable and
+produce identical output.
 
-\begin{center}
-\renderEnergese{examples/simple_system.json}
-\end{center}
+\section{Requirements}
 
-\subsection{JSON Structure}
-The JSON file should contain \texttt{nodes} and \texttt{edges}. Each node must have a \texttt{Tr} (Transformity) value, which determines its horizontal position.
+Lua\LaTeX{} (\TeX{} Live 2023 or later), TikZ with the \texttt{positioning},
+\texttt{arrows.meta}, \texttt{shapes.geometric}, \texttt{calc} and
+\texttt{backgrounds} libraries, and the \texttt{luacode}, \texttt{environ} and
+\texttt{fontspec} packages. The \texttt{dkjson} Lua library ships with the
+package.
+
+Put \texttt{energese.sty}, \texttt{energese-core.lua},
+\texttt{energese-shapes.tex} and \texttt{dkjson.lua} somewhere on the \TeX{}
+search path --- typically the directory holding your document.
+
+\section{Authoring a diagram}
+
+There are three ways in. The first two share the layout engine; the third
+bypasses it.
+
+\subsection{From a JSON file}
 
 \begin{verbatim}
+\renderEnergese{examples/simple_system.json}
+\end{verbatim}
+
+An optional argument is passed straight through to the underlying
+\texttt{tikzpicture}:
+
+\begin{verbatim}
+\renderEnergese[scale=0.8]{examples/simple_system.json}
+\end{verbatim}
+
+The path is resolved relative to the current directory first, then through
+\texttt{kpsewhich}, so a document is not tied to the directory it is compiled
+from. That call produces:
+
+\begin{center}
+\renderEnergese[scale=0.75]{examples/simple_system.json}
+\end{center}
+
+\subsection{From inline JSON}
+
+For a one-off diagram that does not warrant its own file:
+
+\begin{verbatim}
+\begin{energeseData}
 {
   "nodes": [
-    {"id": "sun", "type": "source", "Tr": 1, "label": "Sun"},
+    {"id": "sun",   "type": "source",   "Tr": 1,   "label": "Sun"},
     {"id": "grass", "type": "producer", "Tr": 100, "label": "Grass"}
   ],
   "edges": [
     {"from": "sun", "to": "grass", "type": "energy"}
   ]
 }
+\end{energeseData}
 \end{verbatim}
 
-\section{Node Types}
-The package supports several node types:
+\subsection{From \TeX}
+
+The \texttt{energese} environment describes the same model with declarative
+macros. Keys are exactly the JSON field names, so anything expressible in one
+front end is expressible in the other.
+
+\begin{verbatim}
+\begin{energese}
+    \esmeta{column_spacing=3.0, row_spacing=1.5, show_heat_sink=true}
+
+    \esnode{sun}{source}         {Tr=1,    label={Sun}}
+    \esnode{grass}{producer}     {Tr=100,  label={Grass}}
+    \esnode{cow}{consumer}       {Tr=2000, label={Cow}}
+    \esnode{market}{transaction} {Tr=5000, label={Market}}
+
+    \esflow{sun}{grass}{energy}
+    \esflow{grass}{cow}{energy}
+    \esflow{cow}{market}{energy}
+    \esflow{market}{grass}{money_feedback}
+\end{energese}
+\end{verbatim}
+
+\noindent which renders as:
+
+\begin{center}
+\begin{energese}[scale=0.75]
+    \esmeta{column_spacing=3.0, row_spacing=1.5, show_heat_sink=true}
+
+    \esnode{sun}{source}         {Tr=1,    label={Sun}}
+    \esnode{grass}{producer}     {Tr=100,  label={Grass}}
+    \esnode{cow}{consumer}       {Tr=2000, label={Cow}}
+    \esnode{market}{transaction} {Tr=5000, label={Market}}
+
+    \esflow{sun}{grass}{energy}
+    \esflow{grass}{cow}{energy}
+    \esflow{cow}{market}{energy}
+    \esflow{market}{grass}{money_feedback}
+\end{energese}
+\end{center}
+
+\noindent That is the same system as \texttt{examples/simple\_system.json}, and
+it rasterises identically --- the repository's test suite asserts as much.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{ll}
+\toprule
+Macro & Purpose \\
+\midrule
+\verb|\esnode{<id>}{<type>}{<keys>}|         & Declare a node. \\
+\verb|\esflow{<from>}{<to>}{<type>}{<keys>}| & Declare an edge. \\
+\verb|\esmeta{<keys>}|                       & Set diagram metadata. \\
+\verb|\esboundary{<keys>}|                   & Add a system boundary. \\
+\bottomrule
+\end{tabular}
+\caption{The \TeX{} authoring macros.}
+\end{table}
+
+The trailing key list is optional on every macro. A value containing a comma
+must be braced --- \verb|label_options={midway, above}| --- and a bare key is a
+flag, so \verb|system_boundary| means \verb|system_boundary=true|. Call
+\verb|\esboundary| more than once for several boundaries.
+
+\subsection{Raw TikZ}
+
+The symbols and line styles are ordinary TikZ, so a diagram that wants no
+automatic layout can be drawn by hand:
+
+\begin{verbatim}
+\begin{tikzpicture}
+    \node[energese source]  (sun) at (0,0) {Sun};
+    \node[energese storage] (q)   at (3,0) {$Q$};
+    \draw[energese energy] (sun.energy_out) -- (q.energy_in);
+\end{tikzpicture}
+\end{verbatim}
+
+\begin{center}
+\begin{tikzpicture}
+    \node[energese source]  (sun) at (0,0) {Sun};
+    \node[energese storage] (q)   at (3,0) {$Q$};
+    \draw[energese energy] (sun.energy_out) -- (q.energy_in);
+\end{tikzpicture}
+\end{center}
+
+\section{The model}
+
+\subsection{Nodes}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lll}
+\toprule
+Key & Required & Meaning \\
+\midrule
+\texttt{id}             & yes & Unique identifier, referenced by edges. \\
+\texttt{type}           & yes & One of the types in section~\ref{sec:symbols}. \\
+\texttt{Tr}             & yes$^\dagger$ & Transformity; sets the column. \\
+\texttt{label}          & yes$^\dagger$ & Label text; \LaTeX{} is permitted. \\
+\texttt{short\_label}   & no  & Odum's nomenclature for the node: \texttt{Q1}, \texttt{X2}. \\
+\texttt{label\_position} & no  & \texttt{inside}, \texttt{above} or \texttt{below}. \\
+\texttt{seller}, \texttt{buyer} & no & On a \texttt{transaction}: makes it an exchange. \\
+\texttt{energy\_label}, \texttt{money\_label} & no & Captions for an exchange's two sides. \\
+\texttt{magnitude}      & no  & Scale factor for the symbol. Default \texttt{1.0}. \\
+\texttt{x}, \texttt{y}  & no  & Manual coordinates, overriding the layout. \\
+\texttt{label\_options} & no  & TikZ options applied to the node. \\
+\texttt{clearance\_w}, \texttt{clearance\_h} & no & Override the estimated
+extents used for routing. \\
+\texttt{inside}         & no  & Whether the system window encloses this node.
+Sources default to \texttt{false}, everything else to \texttt{true}. \\
+\texttt{parent}         & no  & On an \texttt{interaction} or
+\texttt{transaction}: the component to attach to. \\
+\texttt{parent\_dx}, \texttt{parent\_dy} & no & The offset from that parent,
+in diagram units. \\
+\texttt{attach}         & no  & \texttt{false} leaves a modifier in a column of
+its own. \\
+\bottomrule
+\end{tabular}
+\caption{Node keys. $\dagger$~not required for \texttt{text}, \texttt{box} or
+\texttt{ground} nodes, which carry no transformity.}
+\end{table}
+
+\subsection{Edges}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lll}
+\toprule
+Key & Required & Meaning \\
+\midrule
+\texttt{from}, \texttt{to} & yes & Node identifiers. \\
+\texttt{type}              & yes & Pathway type; see below. \\
+\texttt{label}             & no  & Label text. \\
+\texttt{label\_options}    & no  & TikZ options for the label node. Supplying
+this places the label by hand; without it the label is placed automatically. \\
+\texttt{options}           & no  & TikZ options for the path, e.g.\ \texttt{bend left=20}. \\
+\texttt{volume}            & no  & Line width in points. Default \texttt{1.0}. \\
+\texttt{from\_anchor}, \texttt{to\_anchor} & no & Override the chosen anchors. \\
+\texttt{waypoints}         & no  & Explicit geometry; overrides automatic routing. \\
+\bottomrule
+\end{tabular}
+\caption{Edge keys.}
+\end{table}
+
+Four pathway types are recognised. \texttt{energy} and \texttt{material} are
+solid arrows and both participate in the layout. \texttt{information} is a solid
+arrow. \texttt{money\_feedback} is dashed and, unless the edge routes itself,
+arcs over the top of the diagram --- money runs counter to energy, so it needs
+to stay clear of it.
+
+Every pathway is drawn at \verb|\energeseflowwidth| with the same arrowhead,
+whether it ends at a symbol or at the ground: they are all flows, and drawing
+dissipation differently would imply it is something else. Set \texttt{volume} on
+an edge to widen it where the model wants to show relative flow.
+
+Pathways are routed \emph{around} any symbol that is not their own endpoint. In
+ESL a line meeting a symbol denotes flow into it, so a pathway crossing an
+unrelated symbol would assert a connection the model does not contain.
+
+An edge that sets its own \texttt{bend} is checked too: the package keeps the
+direction of curvature you asked for and opens the angle until the pathway
+clears, falling back to automatic routing only if no angle does.
+
+\subsection{Exchanges}
+
+An exchange is one transaction with two coupled sides: goods pass one way, money
+the other, and the diamond is where they meet. Declaring the two as separate
+pathways would say something weaker --- that a payment and a delivery both
+happened, not that they are the same transaction.
+
+Give a \texttt{transaction} node a \texttt{seller} and a \texttt{buyer} and the
+package draws all four half-pathways:
+
+\begin{verbatim}
+\esnode{sale}{transaction}{Tr=5000, seller=agri, buyer=consumer,
+                           money_label={\$}, energy_label={food}}
+\end{verbatim}
+
+The diamond is a \emph{marker on the pathway}, not a component the pathway
+enters: goods run from seller to buyer as one continuous line and the diamond
+rides it at the midpoint, rotated to the flow, with the line passing through the
+glyph. Every other symbol is routed around for the good reason that a line
+meeting a symbol denotes flow into it --- but an exchange annotates a coupling
+rather than transforming anything, so there is nothing to flow into. It
+accordingly carries no transformity and no heat sink.
+
+\noindent producing \texttt{seller} $\to$ diamond $\to$ \texttt{buyer} in energy,
+and \texttt{buyer} $\to$ diamond $\to$ \texttt{seller} in money. The legs are
+routed, checked and drawn like any other pathway, and run tightly parallel with
+the money just outside the goods, so that the pair reads as one transaction
+rather than as two pathways that happen to coincide.
+
+\subsection{Geometry from the model}
+
+Automatic layout is a default, not an obligation. A modeller working in a
+drag-and-drop editor has already made every placement decision, and a renderer
+that re-derived them would publish something other than what was drawn. Geometry
+may therefore be supplied at both levels:
+
 \begin{itemize}
-    \item \texttt{source}: Circle
-    \item \texttt{producer}: Lung shape
-    \item \texttt{consumer}: Hexagon
-    \item \texttt{storage}: Tank
-    \item \texttt{interaction}: Pointed block
-    \item \texttt{transaction}: Diamond
+    \item \texttt{x} and \texttt{y} on a node override the layout engine, per
+          axis and independently, so one component can be placed by hand while
+          the rest are laid out automatically.
+    \item \texttt{waypoints} on an edge override the router. In JSON they are a
+          list of pairs, \texttt{"waypoints": [[3, 2], [5, 4]]}; in \TeX{} the
+          same written compactly, \verb|waypoints={3,2; 5,4}|.
 \end{itemize}
 
-\section{Edge Types}
+The two mix freely. A model carrying complete geometry renders exactly as it was
+drawn; one carrying none is laid out from scratch.
+
+\subsection{Metadata}
+
+\texttt{column\_spacing} and \texttt{row\_spacing} tune the layout grid;
+\texttt{show\_heat\_sink} (default true) draws the dissipation pathways and
+their common ground; \texttt{heat\_sink\_label}, \texttt{heat\_sink\_y} and
+\texttt{ground\_x} position and name it; \texttt{system\_boundary} draws one or more enclosing
+rectangles, each taking \texttt{x\_min}, \texttt{x\_max}, \texttt{y\_min},
+\texttt{y\_max}, and optionally \texttt{label} and \texttt{style}.
+
+Setting \texttt{system\_boundary} to \texttt{true} fits the frame
+automatically: a fixed margin outside the extents of everything the model puts
+inside the system, with room underneath for the dissipation funnel, which
+converges inside the frame so that a single line crosses it. Sources are outside
+by convention --- a source is an input from beyond the system --- and any node
+overrides that with \texttt{inside}. \texttt{boundary\_margin} sets the margin
+in diagram units.
+
+\section{Labels}
+
+Odum names symbols as well as describing them: storages $Q_1, Q_2, \ldots$,
+sources and flows $X$ and $J$. Both belong in the model --- the short name is
+what the equations refer to, the long one is what a reader needs --- so a node
+may carry \texttt{label} (the friendly name) and \texttt{short\_label} (Odum's).
+
+\texttt{label\_mode} in the metadata chooses between them:
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lll}
+\toprule
+\texttt{label\_mode} & Inside the symbol & Outside \\
+\midrule
+\texttt{long} (default) & the friendly name & only if it will not fit \\
+\texttt{short}          & Odum's name       & nothing \\
+\texttt{both}           & Odum's name       & the friendly name \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+A symbol grows to hold its label, but only as far as its grid cell; a label
+larger than that would stop the symbol reading as the cell it occupies, so it is
+placed outside instead --- below by default. That decision is automatic, and a
+node overrides it with \texttt{label\_position}.
+
+A displaced label is treated as part of its symbol for routing, so pathways go
+around the text as well as the glyph.
+
+\section{The conventions this package implements}
+\label{sec:conventions}
+
+Odum's Energy Systems Language has no written grammar. Its conventions are real
+but were never stated as rules, so any implementation has to decide what they
+are. This section records the decisions this package makes, so that a diagram it
+produces can be read --- and disagreed with --- precisely.
+
+\subsection{Horizontal position is ordinal in transformity}
+
+Distinct \texttt{Tr} values are sorted and assigned to consecutive columns at
+equal spacing. Transformities of $1$, $100$, $2000$ and $10\,000$ become columns
+one to four.
+
+Placement is therefore neither linear nor logarithmic in transformity. Linear
+placement is unusable, because transformity spans orders of magnitude and every
+low-quality component would collapse into the left margin. A logarithmic axis
+would be legible but would assert a metric the language never defines. Rank
+encodes exactly what the convention claims --- the ordering --- and nothing
+further.
+
+Nodes sharing a transformity share a column, which makes a column an equivalence
+class of energy quality rather than a coordinate.
+
+\subsection{Vertical position is a role, not a quantity}
+
+Nothing in ESL assigns a magnitude to height, so the vertical axis carries no
+quantity of its own. In particular it does not carry power: along a
+transformation chain transformity rises because available power falls, so power
+is already determined --- inversely --- by horizontal position, and encoding it
+vertically as well would be redundant or contradictory.
+
+The vertical axis is not arbitrary either. It carries the same quality ordering
+as the horizontal, applied \emph{relative to the main chain}, so the energy
+hierarchy runs from bottom-left to top-right.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{ll}
+\toprule
+Layer & Rule \\
+\midrule
+On the axis & lies on the longest chain of \emph{energy} pathways \\
+Above       & higher transformity than the chain node it connects to \\
+Below       & receives from the chain at equal or lower transformity \\
+Fanned      & anything the rules cannot classify, in declaration order \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+``Above'' captures high-quality inputs, controllers and higher-quality products;
+``below'' captures dissipation, decomposition and waste storage. This is why
+Odum draws a high-transformity fuel source entering a diagram from the top, and
+why the Sun --- the largest power input to an ecosystem but the lowest in
+quality --- sits at the bottom of the source column.
+
+The chain is built from \texttt{energy} pathways only. A flow of degraded
+material to a waste store is a side branch, and counting it would let such a
+store capture the chain and sit on the axis when it belongs below it.
+
+Set \texttt{layer\_hint} to \texttt{control} or \texttt{decomposition} to name a
+layer explicitly; it wins over the derived one, including for a node lying on
+the main chain. \texttt{y\_gravity} nudges a node, and an explicit \texttt{y}
+overrides everything.
+
+Fanning uses declaration order, never node identifiers: a layout that changed
+when a node was renamed would not be reproducible.
+
+\subsection{The ground is not a component}
+
+If the horizontal axis orders components by energy quality, the heat sink at
+bottom centre looks like a violation --- dissipated energy is the lowest quality
+present and ought to sit at the far left.
+
+It is not a violation, because the ground is not a component. It carries no
+transformity, takes no part in the ordering, and terminates pathways rather than
+transforming anything:
+
+\begin{center}
+\begin{energese}[scale=0.8]
+    \esmeta{column_spacing=3.2, row_spacing=1.6}
+    \esnode{sun}{source}     {Tr=1,    label={Sun}}
+    \esnode{grass}{producer} {Tr=100,  label={Grass}}
+    \esnode{cow}{consumer}   {Tr=2000, label={Cow}}
+    \esflow{sun}{grass}{energy}
+    \esflow{grass}{cow}{energy}
+\end{energese}
+\end{center}
+
+The three components are ordered left to right by transformity. Dissipation runs
+downward --- the vertical convention --- and converges on a ground placed by
+neither rule. Three node types are annotations or terminators rather than
+components and are exempt from carrying transformity: \texttt{ground},
+\texttt{text} and \texttt{box}.
+
+\section{Reading a GSSK model}
+
+\href{https://github.com/energese-project/GSSK}{GSSK} is the simulation kernel this
+notation is drawn for, and its model files are read directly:
+
+\begin{verbatim}
+\renderEnergese{model.json}
+\end{verbatim}
+
+\noindent The same macro, because a GSSK file is normalised into an energese
+model before anything else looks at it. The point is that one file both
+simulates and draws, so a published figure comes from the model that produced
+the results beside it and the two cannot drift.
+
+What the conversion does, beyond renaming fields:
+
 \begin{itemize}
-    \item \texttt{energy}: Solid line with arrow
-    \item \texttt{money\_feedback}: Dashed blue overhead arc
-    \item \texttt{information}: Thin solid line
-    \item \texttt{material}: Solid line
+\item \textbf{Presentation is read out of \texttt{visual}.} GSSK's schema
+forbids extra keys on a node, and reserves \texttt{visual} for exactly this, so
+that is where \texttt{label}, \texttt{Tr}, \texttt{magnitude} and the rest
+belong. The file stays valid for the kernel.
+\item \textbf{Transformity is derived where the model has none}, as the length
+of the longest chain of pathways reaching each component. That orders the
+diagram; it is not an emergy calculation, and the values are $1, 2, 3$ rather
+than plausible-looking figures precisely so that nobody mistakes it for one.
+Supply \texttt{visual.Tr}, or a map under
+\texttt{metadata.energese.transformity}, to say otherwise.
+\item \textbf{Heat sinks are not carried across.} GSSK models dissipation as a
+\texttt{sink} node with pathways into it; this package knows a storage
+dissipates and draws the pathway and the ground itself. Both would draw it
+twice, so the sink and its pathways are dropped.
+\item \textbf{Canvas coordinates are converted}, from pixels with $y$
+downwards into diagram units with $y$ upwards. The placement you made in an
+editor is kept; \texttt{metadata.energese.layout = auto} discards it and lets
+the transformity grid lay the diagram out instead, and
+\texttt{metadata.energese.pixels\_per\_unit} (default $50$) sets the scale.
 \end{itemize}
+
+\noindent \texttt{docs/gssk-interop.md} in the repository has the full field
+mapping and the parts not yet implemented.
+
+\section{Energetic checks}
+\label{sec:checks}
+
+Odum's stated reason for devising ESL was that scholars build models which are
+energetically invalid. A drawing tool cannot help, because it renders whatever
+is drawn. This package checks what a renderer can check without leaving the
+diagram:
+
+\begin{enumerate}
+    \item Energy quality does not fall along an \texttt{energy} pathway.
+    \item Sources take no energy inflow; grounds emit none.
+    \item Every component is reachable from a source.
+    \item Energy that arrives somewhere leaves, as outflow or as dissipation.
+\end{enumerate}
+
+Findings are reported as warnings, because a diagram that breaks a convention is
+often still worth drawing and the author is better placed to judge. Set
+\texttt{strict} in the metadata to make them errors instead.
+
+\subsection{What is deliberately not checked}
+
+\texttt{material} pathways are exempt from the first rule. Degraded material
+moving to a waste or decomposition store genuinely falls in transformity --- that
+is what decomposition is --- so applying the rule to material flows reports
+correct models as broken.
+
+\emph{Conservation of energy is not checked.} Balancing inflow against outflow
+and dissipation requires quantities, and a diagram carries none: \texttt{volume}
+sets a line width, not a flux. Conservation belongs with a simulation kernel
+working from the same model.
+
+\emph{Emergy is not checked at all.} The algorithms are not standardised and
+there is no formal definition to validate against, so a check would assert a
+standard that does not exist. Transformity positions a node; the package neither
+computes nor validates emergy.
+
+The blunt summary: \textbf{if the model is energetically invalid, so is the
+diagram.} The package renders faithfully and does not repair.
+
+\section{Layout}
+
+Horizontal position comes from transformity. The distinct \texttt{Tr} values in
+the diagram are sorted and each is assigned a column, so position reflects
+energy quality rather than the order nodes were declared. Columns are
+\texttt{column\_spacing} apart.
+
+Vertical position comes from the central spine method. The longest chain of
+energy and material pathways is found and laid on the axis; everything else is
+distributed above and below its column's spine at multiples of
+\texttt{row\_spacing}. A node's \texttt{layer\_hint} (\texttt{control} or
+\texttt{decomposition}) nudges it one row up or down, and \texttt{y\_gravity}
+shifts it by an arbitrary amount.
+
+Giving a node explicit \texttt{x} or \texttt{y} overrides the computed value for
+that axis alone, so a single stubborn component can be placed by hand without
+abandoning the layout for the rest.
+
+\subsection{Modifiers travel with what they modify}
+
+An interaction is where two flows combine on their way into the thing they
+drive, and Odum draws it against that thing; a standalone transaction annotates
+a pair of parties in the same way. Given columns of their own by transformity,
+both drift away from the component they modify.
+
+Interactions and transactions are therefore attached: their position is locked
+to a parent's, and they take no part in the column and row algorithms. The
+parent is the component they exchange energy with --- a consumer for preference
+--- and the offset follows the flow, upstream of the parent if the modifier
+feeds it and downstream if the parent feeds the modifier. Name a different
+parent with \texttt{parent}, change the offset with \texttt{parent\_dx} and
+\texttt{parent\_dy}, and switch the whole thing off for one node with
+\texttt{attach=false}. An explicit \texttt{x} or \texttt{y} also wins, as
+everywhere else.
+
+\subsection{Pathways and their labels}
+
+A pathway that would cross a symbol which is not its own endpoint is routed
+around it: in this notation a line meeting a symbol means flow entering that
+symbol, so crossing one asserts a connection the model does not contain. The
+route is the shortest one that avoids every such symbol. An edge with its own
+\texttt{options} (a \texttt{bend}, say) keeps the author's curvature, and the
+angle is opened until it clears; \texttt{waypoints} hands the geometry over
+entirely.
+
+A pathway's \texttt{label} is placed automatically, clear of the symbols, the
+other pathways, the dissipation bundle and the system frame so far as the
+diagram allows. Where symbols stand closer together than the label is wide there
+may be nowhere clear, and the least obstructed position is used. Supplying
+\texttt{label\_options} places the label by hand instead.
+
+\section{Symbols, anchors and ports}
+\label{sec:symbols}
+
+\begin{center}
+\begin{tikzpicture}[node distance=1.1cm]
+    \node[energese source]                            (a) {Source};
+    \node[energese storage, right=of a]               (b) {Storage};
+    \node[energese producer, right=of b]              (c) {Producer};
+    \node[energese consumer, below=1.1cm of a]        (d) {Consumer};
+    \node[energese transaction, right=of d]           (e) {Transaction};
+    \node[energese interaction, right=of e]           (f) {Interaction};
+    \node[energese gain, below=1.1cm of d]            (g) {G};
+    \node[energese loop_limited, right=of g]          (h) {Loop};
+    \node[energese switch, right=of h]                (i) {Switch};
+\end{tikzpicture}
+\end{center}
+
+Every symbol sizes itself to its label, growing its outline around the text so
+the label always sits inside. \texttt{minimum width} and \texttt{minimum height}
+set a floor for symbols with little or no text.
+
+Each flow symbol carries the anchors \texttt{energy\_in}, \texttt{energy\_out},
+\texttt{money\_in}, \texttt{money\_out}, \texttt{feedback\_in} and
+\texttt{heat\_sink}, in addition to \texttt{center}, \texttt{north},
+\texttt{south}, \texttt{east} and \texttt{west}. \texttt{feedback\_out} is
+defined on every symbol except \texttt{source} and \texttt{interaction}. Energy
+enters on the left and leaves on the right; money moves through the upper half;
+dissipation leaves through \texttt{heat\_sink} at the bottom.
+
+\subsection{Ports}
+\label{sec:ports}
+
+Every symbol carries a \emph{connection ring}: points spaced a fixed distance
+apart along its outline, named by index as \texttt{ring0} at $0$ degrees,
+counting anticlockwise. The spacing is \verb|\energeseanchorpitch| ($3$\,mm by
+default), so a larger symbol carries more points than a small one and a coupled
+pair attaching at adjacent indices is separated by the same distance whichever
+symbol it meets. The count is rounded to a multiple of four, which puts a point
+exactly on each axis and holds the spacing to within one point in four of the
+pitch.
+
+These points are the symbol's \emph{ports}, and they are the only places a
+pathway attaches. Two consequences follow, and they are what the renderer
+guarantees:
+
+\begin{itemize}
+\item \textbf{A named anchor is a port.} \texttt{energy\_in} names a direction
+--- where energy belongs, as Odum draws it --- and the pathway attaches at the
+port nearest that direction. For the anchors on an axis that is the same point;
+elsewhere it is within half a pitch of it.
+\item \textbf{A port holds one pathway.} The second pathway to want a port
+takes the next one along, on the side it approaches from, so a fan of flows
+leaves a symbol as a fan rather than as one line drawn several times.
+\end{itemize}
+
+Neither is something to arrange by hand: \verb|\renderEnergese| and the
+\texttt{energese} environment allocate ports for every pathway they draw.
+Hand-drawn TikZ can use the same machinery, and address a port directly where
+the choice of connection point is geometric rather than semantic:
+
+\begin{verbatim}
+\draw[energese energy] (a.ring3) -- (b.ring9);
+\draw[energese money_feedback] (b.ring10) -- (a.ring2);
+\end{verbatim}
+
+\noindent or ask for one and let the allocator place it:
+
+\begin{verbatim}
+\energeseresetports                  % begin a diagram
+\energeseport{a}{energy_out}{b}      % a's port, facing b
+\let\from\energeseportname
+\energeseport{b}{energy_in}{a}
+\draw[energese energy] (\from) -- (\energeseportname);
+\end{verbatim}
+
+\noindent A symbol whose ports are all taken warns and doubles up rather than
+dropping the pathway. \texttt{box}, \texttt{text} and \texttt{ground} have no
+ring, and pathways meet them at the named anchor.
+
+\texttt{gain} is the constant-gain amplifier, \texttt{loop\_limited} the
+loop-limited converter and \texttt{switch} the on/off switching action. Because
+a triangle is a poor container for text, label a \texttt{gain} with a single
+character as Odum does; a long label there will overflow the apex.
+
+Three further node types are plain TikZ rather than Odum symbols:
+\texttt{box} (a rectangle), \texttt{text} (an unboxed label, useful as a routing
+waypoint) and \texttt{ground} (the heat-sink terminator glyph).
+
+Symbol outlines are drawn at \verb|\energeselinewidth|, which defaults to
+$0.9$\,pt to match the constant pen weight measured in Odum's published sheet.
+Redefine it with \verb|\setlength| for a heavier or lighter house style.
+
+Every symbol holds its shape. A shape has a canonical aspect ratio measured from
+Odum's sheet, and it keeps that ratio at every size: a symbol grows uniformly to
+hold a longer label rather than stretching, because a widened hexagon reads as a
+different symbol. Where a label will not fit even so, the label is displaced
+rather than the shape distorted.
+
+\texttt{magnitude} scales the symbol and not its label, so symbols of different
+magnitude carrying the same words are set in the same type size.
+
+Sizes are set on an invisible grid. Each shape encloses its label differently,
+so sizing every symbol purely from its own text would make identical labels
+produce very different symbols. \verb|\energeseunit| is one grid cell
+(default $1.1$\,cm), and each symbol's minimum size is the multiple of a cell
+at which it lands on the relative height Odum draws it at. A label that will not
+fit its cell grows its own symbol. To scale a whole diagram's symbols together,
+set the unit:
+
+\begin{verbatim}
+\setlength{\energeseunit}{1.4cm}
+\end{verbatim}
+
+Note that TikZ's \texttt{font} key is a single value, so a
+\texttt{label\_options} of \verb|font=\large| replaces the style's
+\verb|font=\sffamily| rather than adding to it. Write
+\verb|font=\sffamily\large| to keep the sans face.
+
+\section{Heat sinks and the system window}
+
+Unless \texttt{show\_heat\_sink} is false, every dissipating component runs a
+pathway downwards which converges, with all the others, on a single ground
+symbol. Dissipation is flow to a common sink, not contact with a surface, so
+there is no horizontal floor line.
+
+The dissipating types are \texttt{producer}, \texttt{consumer},
+\texttt{storage}, \texttt{transaction}, \texttt{gain},
+\texttt{loop\_limited} and \texttt{switch}. Sources and interactions dissipate
+nothing in Odum's convention, and \texttt{text}, \texttt{box} and
+\texttt{ground} are plain shapes with no \texttt{heat\_sink} anchor.
+
+Where a system window is drawn, the dissipation pathways converge just inside it
+and a single line crosses the frame to reach the ground outside. Each pathway
+crossing separately would shred the boundary, and would misstate the accounting:
+what leaves the system is one aggregate flow of used energy, not several.
+
+\texttt{system\_boundary} draws an optional \emph{system window}: the frame
+declaring what the model treats as inside the system, and therefore what its
+macro-level inputs and outputs are. The ground symbol is always placed
+\emph{outside} that window --- used energy leaves the system, so its terminator
+cannot sit within the frame. A \texttt{heat\_sink\_y} that would put the ground
+inside the window is overridden rather than honoured.
+
+\section{A worked example}
+
+\texttt{examples/aggregated-economy.json} reproduces a classic Odum figure. It
+exercises manual coordinates, a system boundary, a relocated heat sink and
+several money-feedback arcs:
+
+\begin{center}
+\renderEnergese[scale=0.42]{examples/aggregated-economy.json}
+\end{center}
 
 \end{document}

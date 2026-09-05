@@ -1,0 +1,142 @@
+% Routing: what the visibility-graph router is required to produce.
+%
+% A rendered diagram shows where the pathways went; this says why. Each check
+% asserts a property of the path itself -- that it clears the obstacle, that it
+% is no longer than the shortest way round, that the drawn curve clears it too
+% -- so a router that merely produces some path fails here rather than passing
+% on the strength of a plausible-looking picture.
+\documentclass{article}
+\usepackage{luacode}
+
+\begin{luacode*}
+    package.path = package.path .. ";./?.lua"
+    energese = require("energese-core")
+
+    -- Globals, not locals: each luacode block is its own chunk.
+    function length(x1, y1, pts, x2, y2)
+        local total, px, py = 0, x1, y1
+        for _, p in ipairs(pts) do
+            total = total + math.sqrt((p[1] - px) ^ 2 + (p[2] - py) ^ 2)
+            px, py = p[1], p[2]
+        end
+        return total + math.sqrt((x2 - px) ^ 2 + (y2 - py) ^ 2)
+    end
+
+    function whole(x1, y1, pts, x2, y2)
+        local out = { { x1, y1 } }
+        for _, p in ipairs(pts) do out[#out + 1] = p end
+        out[#out + 1] = { x2, y2 }
+        return out
+    end
+\end{luacode*}
+
+\begin{document}
+
+\begin{luacode*}
+    -- 1. Nothing in the way: no waypoints at all. A router that always
+    --    produces a detour would make every pathway in every diagram bend.
+    local clear = energese.route(0, 0, 6, 0, { { id = "b", x = 3, y = 4, hw = 0.5, hh = 0.5 } }, 0.05)
+    assert(#clear == 0, "Test 1 FAILED: routed around an obstacle it never meets")
+    texio.write_nl("v Test 1 PASSED: an unobstructed pathway is left straight")
+
+    -- 2. One symbol dead on the line: the pathway goes around it, and the
+    --    curve drawn through the result clears it as well.
+    local boxes = { { id = "mid", x = 3, y = 0, hw = 0.6, hh = 0.6 } }
+    local pts = energese.route(0, 0, 6, 0, boxes, 0.05)
+    assert(#pts > 0, "Test 2 FAILED: no detour around a symbol on the line")
+    assert(energese.curve_is_clear(whole(0, 0, pts, 6, 0), boxes, 0.05),
+           "Test 2 FAILED: the drawn curve still crosses the symbol")
+    texio.write_nl("v Test 2 PASSED: a symbol on the line is cleared, curve included")
+
+    -- 3. The way round is the short one. Taut around a single box, the path is
+    --    two sides of a triangle over its near corners; anything materially
+    --    longer means the router is not finding the shortest way. The bound is
+    --    the straight line plus the detour a taut string would make, with a
+    --    little room for the clearance the corners are inflated by.
+    local direct = 6.0
+    assert(length(0, 0, pts, 6, 0) < direct * 1.35,
+           "Test 3 FAILED: the detour is far longer than the shortest way round")
+    texio.write_nl("v Test 3 PASSED: the detour is taut, not a staircase")
+
+    -- 4. Two symbols in a row, the case the old step-over router got wrong:
+    --    clearing the first by the smaller deviation pushed the pathway into
+    --    the second. Both must be clear at once.
+    local pair = {
+        { id = "a", x = 2.0, y = 0.0, hw = 0.6, hh = 0.6 },
+        { id = "b", x = 4.0, y = 0.5, hw = 0.6, hh = 0.6 },
+    }
+    local two = energese.route(0, 0, 6, 0, pair, 0.05)
+    assert(energese.curve_is_clear(whole(0, 0, two, 6, 0), pair, 0.05),
+           "Test 4 FAILED: a pathway cleared one symbol into another")
+    texio.write_nl("v Test 4 PASSED: a corridor of two symbols is cleared at once")
+
+    -- 5. A symbol whose clearance swallows an endpoint is not an obstacle for
+    --    that pathway: there is no way out of a box you begin inside, and
+    --    treating it as one leaves the router with no path to report.
+    local hugging = { { id = "close", x = 0.3, y = 0, hw = 0.6, hh = 0.6 },
+                      { id = "mid", x = 3, y = 0, hw = 0.6, hh = 0.6 } }
+    local out = energese.route(0, 0, 6, 0, hugging, 0.05)
+    assert(#out > 0, "Test 5 FAILED: an endpoint inside a clearance stopped the router")
+    texio.write_nl("v Test 5 PASSED: a box containing an endpoint is not an obstacle")
+
+    -- 6. Determinism. Goldens are only meaningful if the same model routes the
+    --    same way every time, and a shortest path is not unique.
+    local again = energese.route(0, 0, 6, 0, boxes, 0.05)
+    assert(#again == #pts, "Test 6 FAILED: the router is not deterministic")
+    for i = 1, #pts do
+        assert(math.abs(again[i][1] - pts[i][1]) < 1e-12
+           and math.abs(again[i][2] - pts[i][2]) < 1e-12,
+           "Test 6 FAILED: the router is not deterministic")
+    end
+    texio.write_nl("v Test 6 PASSED: routing is deterministic")
+
+    -- 7. The dissipation bundle's lanes: nearest the trunk gets the highest
+    --    lane, furthest the lowest. Two tributaries sharing a lane could cross.
+    local lane, count = energese.dissipation_lanes(
+        { "far", "near", "mid" },
+        { far = 0.0, near = 4.5, mid = 2.0 }, 5.0)
+    assert(count == 3, "Test 7 FAILED: wrong number of lanes")
+    assert(lane.near == 1 and lane.mid == 2 and lane.far == 3,
+           "Test 7 FAILED: lanes are not ordered by reach")
+    texio.write_nl("v Test 7 PASSED: dissipation lanes nest by reach")
+
+    -- 8. Semantic grouping: an interaction is locked to what it drives, on the
+    --    upstream side, and takes no column of its own.
+    local nodes = {
+        { id = "sun", type = "source", Tr = 1 },
+        { id = "ix", type = "interaction", Tr = 500 },
+        { id = "town", type = "consumer", Tr = 2000, label = "Town" },
+    }
+    local edges = {
+        { from = "sun", to = "ix", type = "energy" },
+        { from = "ix", to = "town", type = "energy" },
+    }
+    local attached = energese.attach_modifiers(nodes, edges, 3.0)
+    assert(attached.ix and attached.ix.parent == "town",
+           "Test 8 FAILED: the interaction was not attached to what it drives")
+    assert(attached.ix.dx < 0, "Test 8 FAILED: the interaction was not put upstream of its parent")
+    local tr_map = energese.calculate_transformity_columns(nodes, attached)
+    assert(tr_map[500] == nil, "Test 8 FAILED: an attached modifier claimed a column")
+    texio.write_nl("v Test 8 PASSED: modifiers attach upstream and claim no column")
+
+    -- 9. The system window encloses the extents of what is inside it, and
+    --    leaves the sources out.
+    local boxes9 = {
+        { id = "sun", x = 0, y = 0, hw = 0.5, hh = 0.5 },
+        { id = "town", x = 4, y = 0, hw = 1.0, hh = 0.8 },
+    }
+    local nodes9 = {
+        { id = "sun", type = "source" },
+        { id = "town", type = "consumer" },
+    }
+    local win = energese.system_bounds(nodes9, boxes9, 0.5)
+    assert(math.abs(win.x_min - 2.5) < 1e-9 and math.abs(win.x_max - 5.5) < 1e-9,
+           "Test 9 FAILED: the window does not fit the extents of what is inside")
+    assert(math.abs(win.y_max - 1.3) < 1e-9,
+           "Test 9 FAILED: the window ignored a symbol's height")
+    texio.write_nl("v Test 9 PASSED: the window fits extents, sources outside")
+\end{luacode*}
+
+All routing tests passed.
+
+\end{document}

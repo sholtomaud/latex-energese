@@ -7,31 +7,246 @@
 \RequirePackage{environ}
 \RequirePackage{fontspec}
 
-\setsansfont{TeX Gyre Heros Cn}
+\IfFontExistsTF{TeX Gyre Heros Cn}{\setsansfont{TeX Gyre Heros Cn}}{}
 
 % Load PGF shapes
 \input{energese-shapes.tex}
 
+% Odum draws symbol outlines with a constant pen, measured at 2px in a 144 dpi
+% capture of the published sheet -- about 1pt, and notably heavier than TikZ's
+% 0.4pt default. Flow pathways carry their own width from the model's `volume'.
+\newlength{\energeselinewidth}
+\setlength{\energeselinewidth}{0.9pt}
+
+% The grid. Symbols size themselves to their labels, but each shape's height
+% grows from the label at a different rate -- a producer at 2.0 times the text
+% half-height, a consumer at 3.23, an amplifier at 5.2 -- so identical labels
+% would otherwise produce wildly different symbols.
+%
+% \energeseunit is one grid cell. Each symbol's minimum size is set to the
+% multiple of a cell at which its bare form lands on the relative height Odum
+% draws it at, measured from the published sheet (producer = 1.000, source
+% 1.016, storage 1.000, consumer 1.306, loop_limited 0.855, switch 0.903, gain
+% 0.581, interaction 0.565, transaction 0.500). Short labels then fall inside
+% that floor and every symbol sits on the grid; a label too large for its cell
+% grows its own symbol, which is the only sane way to keep the text readable.
+%
+% Enlarge the unit for a coarser grid; every symbol scales together.
+\newlength{\energeseunit}
+\setlength{\energeseunit}{1.1cm}
+
+% One width for every pathway, whatever it carries and wherever it goes. An
+% edge may still override it per flow through the model's `volume' key.
+\newlength{\energeseflowwidth}
+\setlength{\energeseflowwidth}{0.9pt}
+
+% Labels sit inside the symbols, so they want to be smaller than body text.
+\newcommand{\energeselabelfont}{\sffamily\footnotesize}
+
 % TikZ Styles
 \tikzset{
+    % Scales the symbol without scaling its label.
+    energese magnitude/.code={\def\energesemagnitude{#1}},
     % Global arrow style
-    >={Stealth[length=3.5pt, width=2pt]},
+    >={Triangle[length=5pt, width=4.2pt]},
     % Node styles
-    energese source/.style={draw, shape=energese source, minimum size=0.8cm, align=center, fill=white, font=\sffamily},
-    energese producer/.style={draw, shape=energese producer, minimum size=1cm, align=center, fill=white, font=\sffamily},
-    energese consumer/.style={draw, shape=energese consumer, minimum size=1cm, align=center, fill=white, font=\sffamily},
-    energese storage/.style={draw, shape=energese storage, minimum size=0.8cm, align=center, fill=white, font=\sffamily},
-    energese interaction/.style={draw, shape=energese interaction, minimum size=1cm, align=center, fill=white, font=\sffamily},
-    energese transaction/.style={draw, shape=energese transaction, minimum size=1cm, align=center, fill=white, font=\sffamily},
-    energese ground/.style={draw=none, shape=energese ground, fill=none},
-    energese box/.style={draw, shape=rectangle, align=center, fill=white, font=\sffamily},
-    energese text/.style={align=center, font=\sffamily},
+    energese source/.style={draw, energese magnitude=1, line width=\energeselinewidth, shape=energese source, minimum height=0.7184\energeseunit, minimum width=0.7184\energeseunit, align=center, fill=white, font=\energeselabelfont},
+    energese producer/.style={draw, energese magnitude=1, line width=\energeselinewidth, shape=energese producer, minimum height=1.0\energeseunit, minimum width=1.226\energeseunit, align=center, fill=white, font=\energeselabelfont},
+    energese consumer/.style={draw, energese magnitude=1, line width=\energeselinewidth, shape=energese consumer, minimum height=0.601\energeseunit, minimum width=0.601\energeseunit, align=center, fill=white, font=\energeselabelfont},
+    energese storage/.style={draw, energese magnitude=1, line width=\energeselinewidth, shape=energese storage, minimum height=0.5495\energeseunit, minimum width=0.5495\energeseunit, align=center, fill=white, font=\energeselabelfont},
+    energese interaction/.style={draw, energese magnitude=1, line width=\energeselinewidth, shape=energese interaction, minimum height=0.480\energeseunit, minimum width=0.480\energeseunit, align=center, fill=white, font=\energeselabelfont},
+    energese transaction/.style={draw, energese magnitude=1, line width=\energeselinewidth, shape=energese transaction, minimum height=0.250\energeseunit, minimum width=0.250\energeseunit, align=center, fill=white, font=\energeselabelfont},
+    % The loop-limited converter's body is taller than wide in Odum's sheet
+    % (about 40x53); that ratio, not the path, gives the reference aspect.
+    energese gain/.style={draw, energese magnitude=1, line width=\energeselinewidth, shape=energese gain, minimum height=0.240\energeseunit, minimum width=0.240\energeseunit, align=center, fill=white, font=\energeselabelfont},
+    energese loop_limited/.style={draw, energese magnitude=1, line width=\energeselinewidth, shape=energese loop_limited, minimum height=0.855\energeseunit, minimum width=0.645\energeseunit, align=center, fill=white, font=\energeselabelfont},
+    energese switch/.style={draw, energese magnitude=1, line width=\energeselinewidth, shape=energese switch, minimum height=0.645\energeseunit, minimum width=0.645\energeseunit, align=center, fill=white, font=\energeselabelfont},
+    energese ground/.style={draw=none, line width=\energeselinewidth, shape=energese ground, fill=none},
+    energese box/.style={draw, line width=\energeselinewidth, shape=rectangle, align=center, fill=white, font=\energeselabelfont},
+    energese text/.style={align=center, font=\energeselabelfont},
     % Edge styles
-    energese energy/.style={->, semithick, solid, black},
-    energese material/.style={->, semithick, solid, black},
-    energese money_feedback/.style={->, dashed, black, out=90, in=90, looseness=1.5},
-    energese information/.style={->, thin, solid, black},
-    energese heat/.style={draw, solid, black}
+    energese energy/.style={->, solid, black, line width=\energeseflowwidth},
+    energese material/.style={->, solid, black, line width=\energeseflowwidth},
+    % Appearance only. Routing (bend/out/in/looseness) is a per-edge decision
+    % supplied by the model; baking it into the style fights any edge that
+    % sets its own bend and blows the arc up into a full circle.
+    energese money_feedback/.style={->, dashed, black, line width=\energeseflowwidth},
+    energese information/.style={->, solid, black, line width=\energeseflowwidth},
+    % Dissipation pathways carry the same weight as energy pathways.
+    % Dissipation pathways converge on a single ground, so they carry no head
+    % of their own -- one flow, one arrowhead, at the terminator.
+    energese heat/.style={-, solid, black, line width=\energeseflowwidth}
+}
+
+%% -------------------------------------------------------------------------
+%% Ports
+%%
+%% A symbol's connection ring (energese-shapes.tex) is its set of ports, and a
+%% port takes one pathway. Two flows attached at the same point are drawn as
+%% one line leaving the symbol, which understates how many pathways there are
+%% and hides which of them the arrowhead belongs to; Odum draws them separated.
+%%
+%%   \energeseport{<node>}{<anchor>}{<node at the other end>}
+%%
+%% puts the coordinate to attach to in \energeseportname, and marks that port
+%% occupied for the rest of the diagram. The rules:
+%%
+%%   * the named anchor is read for its *direction* only and quantised to the
+%%     nearest port on the ring. A named anchor is therefore always a real
+%%     port -- which is what makes occupancy answerable at all, and what keeps
+%%     the drawn connection points and the attachment points the same set;
+%%   * if that port is taken the search steps outward along the ring, trying
+%%     the side facing the other end of the pathway first, so a fan of
+%%     pathways leaves in the order it arrives instead of crossing itself;
+%%   * a shape with no ring -- box, text, ground -- yields the named anchor
+%%     unchanged and claims nothing;
+%%   * a symbol with every port taken falls back to the named anchor and warns,
+%%     rather than dropping the pathway.
+%%
+%% Claims are global and last one diagram; \energeseresetports begins the next.
+%% \energesekeepport / \energeserecallport stash a port under a key, for the
+%% two-stage case where the port must be claimed before the pathway that uses
+%% it can be drawn (dissipation, which is reserved ahead of every pathway
+%% because it has nowhere else to go).
+%% -------------------------------------------------------------------------
+\newcount\energese@portserial
+\newcount\energese@portN
+\newcount\energese@portD
+\newcount\energese@portS
+\newcount\energese@portJ
+\newcount\energese@portI
+\newcount\energese@portM
+\newif\ifenergese@portfound
+\newdimen\energese@portax \newdimen\energese@portay
+\newdimen\energese@portcx \newdimen\energese@portcy
+\newdimen\energese@porttx \newdimen\energese@portty
+\newdimen\energese@portrc \newdimen\energese@portrcy
+\newdimen\energese@portru \newdimen\energese@portruy
+\def\energese@portclaimed{1}
+
+% Each shape declares ring0..ring47, so this is the highest port the renderer
+% can name. \energese@ringN clamps the count to the same 48, so the check below
+% never fires in practice -- it is here so that a shape which forgot to clamp
+% degrades to a doubled-up port rather than to a pathway attached on the far
+% side of the symbol.
+\def\energese@ringmax{48}
+
+\newcommand{\energeseresetports}{%
+    \global\advance\energese@portserial by 1\relax}
+
+\def\energeseportname{}
+
+\newcommand{\energesekeepport}[1]{%
+    \expandafter\global\expandafter\let
+        \csname energese@kept@#1\endcsname\energeseportname}
+\newcommand{\energeserecallport}[1]{%
+    \expandafter\let\expandafter\energeseportname
+        \csname energese@kept@#1\endcsname}
+
+% A node PGF has never heard of, or one whose shape declares no ring, keeps
+% the anchor it was asked for. \csname alone would not do here: it defines an
+% unknown name as \relax, which \ifcsname then reports as a shape.
+\newcommand{\energeseport}[3]{%
+    \def\energeseportname{#1.#2}%
+    \ifcsname pgf@sh@ns@#1\endcsname
+        \edef\energese@portshape{\csname pgf@sh@ns@#1\endcsname}%
+        \ifcsname pgf@anchor@\energese@portshape @ringcount\endcsname
+            \energese@allocport{#1}{#2}{#3}%
+        \fi
+    \fi
+}
+
+% The claim on one port of one node, for one diagram.
+\def\energese@portkey#1{energese@port@\the\energese@portserial @#1@\the\energese@portI}
+
+\def\energese@allocport#1#2#3{%
+    % Read every point first. pgfmath assigns to \pgf@x itself, so a single
+    % \pgfmathsetmacro between two \pgfpointanchor calls loses the first one.
+    \pgfpointanchor{#1}{center}%
+    \energese@portcx=\pgf@x \energese@portcy=\pgf@y
+    \pgfpointanchor{#1}{ringcount}%
+    \energese@portrc=\pgf@x \energese@portrcy=\pgf@y
+    \pgfpointanchor{#1}{ringunit}%
+    \energese@portru=\pgf@x \energese@portruy=\pgf@y
+    \pgfpointanchor{#1}{#2}%
+    \energese@portax=\pgf@x \energese@portay=\pgf@y
+    \pgfpointanchor{#3}{center}%
+    \energese@porttx=\pgf@x \energese@portty=\pgf@y
+    % The count as a ratio of two offsets that were transformed alike, so a
+    % picture drawn with `scale' or `xscale' reports the count the shape
+    % actually declared rather than a scaled version of it.
+    \advance\energese@portrc by -\energese@portcx
+    \advance\energese@portrcy by -\energese@portcy
+    \advance\energese@portru by -\energese@portcx
+    \advance\energese@portruy by -\energese@portcy
+    \pgfmathsetmacro{\energese@portunit}%
+        {max(0.0001, veclen(\the\energese@portru, \the\energese@portruy))}%
+    \pgfmathtruncatemacro{\energese@portNv}%
+        {max(1, round(veclen(\the\energese@portrc, \the\energese@portrcy)
+                      / \energese@portunit))}%
+    \pgfmathanglebetweenpoints
+        {\pgfqpoint{\energese@portcx}{\energese@portcy}}
+        {\pgfqpoint{\energese@portax}{\energese@portay}}%
+    \let\energese@portanga\pgfmathresult
+    \pgfmathanglebetweenpoints
+        {\pgfqpoint{\energese@portcx}{\energese@portcy}}
+        {\pgfqpoint{\energese@porttx}{\energese@portty}}%
+    \let\energese@portangt\pgfmathresult
+    % The port nearest the anchor's direction, and which way round the ring the
+    % other end of the pathway lies. sin of the difference gives that sign
+    % without any wrapping arithmetic; a pathway to the symbol's own centre
+    % (dissipation, reserved against itself) gives 0 and searches upward.
+    \pgfmathtruncatemacro{\energese@portDv}%
+        {round(\energese@portanga * \energese@portNv / 360)}%
+    \pgfmathtruncatemacro{\energese@portSv}%
+        {(sin(\energese@portangt - \energese@portanga) < 0) ? -1 : 1}%
+    \energese@portN=\energese@portNv\relax
+    \energese@portS=\energese@portSv\relax
+    \energese@portD=\energese@portDv\relax
+    \energese@portwrap\energese@portD
+    \energese@portJ=0
+    \energese@portfoundfalse
+    \energese@porttry{#1}%
+    \ifenergese@portfound\else
+        \PackageWarning{energese}{Every port on `#1' is occupied: the pathway
+            to `#3' shares the `#2' anchor with another}%
+    \fi
+}
+
+% Indices arrive within one turn of the ring either side, so a single
+% correction in each direction brings them home.
+\def\energese@portwrap#1{%
+    \ifnum#1<0 \advance#1 by \energese@portN\fi
+    \ifnum#1<\energese@portN\else \advance#1 by -\energese@portN\fi
+}
+
+\def\energese@porttry#1{%
+    \ifnum\energese@portJ<\energese@portN
+        % Offsets 0, +s, -s, +2s, -2s, ...: the desired port first, then
+        % outward, starting on the side the pathway comes from.
+        \energese@portM=\energese@portJ
+        \advance\energese@portM by 1
+        \divide\energese@portM by 2
+        \ifodd\energese@portJ
+            \multiply\energese@portM by \energese@portS
+        \else
+            \multiply\energese@portM by -\energese@portS
+        \fi
+        \energese@portI=\energese@portD
+        \advance\energese@portI by \energese@portM
+        \energese@portwrap\energese@portI
+        \ifnum\energese@portI<\energese@ringmax
+            \ifcsname\energese@portkey{#1}\endcsname
+            \else
+                \expandafter\global\expandafter\let
+                    \csname\energese@portkey{#1}\endcsname\energese@portclaimed
+                \edef\energeseportname{#1.ring\the\energese@portI}%
+                \energese@portfoundtrue
+            \fi
+        \fi
+        \advance\energese@portJ by 1
+        \ifenergese@portfound\else\energese@porttry{#1}\fi
+    \fi
 }
 
 \begin{luacode*}
@@ -55,19 +270,67 @@
     end
 \end{luacode*}
 
-\newcommand{\renderEnergese}[2][]{
-    \directlua{
-        local data = energese.parse_json_file([[#2]])
-        energese.render(data, [[#1]])
-    }
+% The %-terminated lines matter: an unguarded newline inside the definition
+% leaks an interword space into the document and pads the picture's bounding box.
+\newcommand{\renderEnergese}[2][]{%
+    \directlua{%
+        local data = energese.parse_json_file([[#2]])%
+        energese.render(data, [[#1]])%
+    }%
 }
 
-\NewEnviron{energeseData}[1][]{
-    \directlua{
-        local data = energese.parse_json(\energeseWrapLua{\BODY})
-        energese.render(data, [[#1]])
-    }
+\NewEnviron{energeseData}[1][]{%
+    \directlua{%
+        local data = energese.parse_json(\energeseWrapLua{\BODY})%
+        energese.render(data, [[#1]])%
+    }%
 }
 
 % Helper to wrap content in Lua long brackets to handle special characters safely
 \newcommand{\energeseWrapLua}[1]{[===[#1]===]}
+
+%% -------------------------------------------------------------------------
+%% TeX-native authoring
+%%
+%%   \begin{energese}[<tikzpicture options>]
+%%     \esmeta{column spacing keys...}
+%%     \esnode{<id>}{<type>}{<key=value, ...>}
+%%     \esflow{<from>}{<to>}{<type>}{<key=value, ...>}
+%%   \end{energese}
+%%
+%% The macros build the same model table the JSON front end produces, so both
+%% paths run through one layout engine and one renderer. The trailing options
+%% group is optional on every macro.
+%%
+%% Keys are exactly the JSON field names: Tr, label, magnitude, x, y,
+%% label_options, options, volume, from_anchor, to_anchor. Values containing a
+%% comma must be braced, e.g. label_options={midway, above}.
+%% -------------------------------------------------------------------------
+
+% Pass an argument to Lua verbatim: \detokenize stops TeX expanding the LaTeX
+% inside a label, \luaescapestring makes the result a safe Lua string literal.
+\newcommand{\energese@arg}[1]{\luaescapestring{\detokenize{#1}}}
+
+% Declaration macros typeset nothing, so the newline that follows each one must
+% not survive as an interword space -- inside a standalone hbox it would widen
+% the picture. \ignorespaces eats it; \par is neutralised in the environment so
+% blank lines can still separate groups of declarations.
+\NewDocumentCommand{\esmeta}{m}{%
+    \directlua{energese.tex_meta("\energese@arg{#1}")}\ignorespaces
+}
+
+\NewDocumentCommand{\esboundary}{m}{%
+    \directlua{energese.tex_boundary("\energese@arg{#1}")}\ignorespaces
+}
+
+\NewDocumentCommand{\esnode}{m m G{}}{%
+    \directlua{energese.tex_node("\energese@arg{#1}", "\energese@arg{#2}", "\energese@arg{#3}")}\ignorespaces
+}
+
+\NewDocumentCommand{\esflow}{m m m G{}}{%
+    \directlua{energese.tex_edge("\energese@arg{#1}", "\energese@arg{#2}", "\energese@arg{#3}", "\energese@arg{#4}")}\ignorespaces
+}
+
+\NewDocumentEnvironment{energese}{O{}}
+    {\let\par\relax\directlua{energese.tex_begin()}\ignorespaces}
+    {\directlua{energese.tex_end("\energese@arg{#1}")}\ignorespacesafterend}

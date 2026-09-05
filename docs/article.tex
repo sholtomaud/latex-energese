@@ -1,0 +1,1082 @@
+%% article.tex -- draft for submission to Ecological Modelling.
+%%
+%% STATUS: section plan with worked figures. Prose marked [OUTLINE] is a plan of
+%% what the section must argue, not finished text.
+%%
+%% Submission format: Elsevier wants elsarticle.cls. That class is not in the
+%% build container, so this drafts in `article` and switches at submission:
+%%   \documentclass[preprint,12pt]{elsarticle}
+%% with \begin{frontmatter}...\end{frontmatter} replacing \maketitle.
+%%
+%% Figures come from the fidelity harness, not from hand-drawn illustrations:
+%%   make compare sheet     # regenerates every figure this file includes
+%% That is deliberate. The figures showing that the symbols match Odum's
+%% originals are produced by the same code that tests it.
+
+\documentclass[11pt,a4paper]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{graphicx}
+\usepackage{subcaption}
+\usepackage{booktabs}
+\usepackage{listings}
+\usepackage{natbib}
+\usepackage{energese}
+\usepackage{hyperref}
+
+% Both spellings, so the paper builds whether lualatex runs from the repository
+% root (as the Makefile does) or from docs/ (as an editor's build button does).
+\graphicspath{{tests/fidelity/out/}{reference-images/}%
+              {../tests/fidelity/out/}{../reference-images/}}
+
+\lstset{basicstyle=\ttfamily\footnotesize, columns=fullflexible,
+        breaklines=true, frame=single, framesep=4pt, xleftmargin=6pt}
+
+\title{Energese: reproducible typesetting of Odum Energy Systems Language
+       diagrams in \LaTeX}
+\author{S. Maud}
+\date{Draft}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+[OUTLINE] State the problem: Energy Systems Language diagrams are drawn by hand
+in general-purpose vector tools, so they are not reproducible, not
+version-controllable, not generated from the models they depict, and drift from
+Odum's published symbol conventions. State the contribution: \texttt{energese},
+a Lua\LaTeX{} package that renders ESL diagrams from a declarative model, in
+either JSON or \TeX, through a single layout engine; and a two-tier fidelity
+method that makes conformance to Odum's symbols a machine-checked property
+rather than a matter of opinion. State the result quantitatively: all nine
+implemented symbols agree with geometry measured from Odum's published sheet to
+within measurement precision on two independent invariants, and the two
+authoring front ends are verified to produce byte-identical raster output for
+models up to and including a complete published figure. State the availability: CTAN, with the
+model format shared with the GSSK simulation kernel so one file both simulates
+and draws.
+\end{abstract}
+
+\noindent\textbf{Keywords:} energy systems language; emergy; systems ecology;
+scientific typesetting; reproducible figures; H.T. Odum
+
+\section{Introduction}
+\label{sec:intro}
+
+[OUTLINE] Three moves.
+
+\emph{Why ESL matters.} Odum's Energy Systems Language is a formal notation, not
+an illustrative convention: each symbol carries defined semantics about energy
+quality, storage, interaction and dissipation \citep{odum1994,odum1996}. A
+diagram is a specification.
+
+\emph{Why current practice undermines that.} In practice ESL diagrams are drawn
+by hand. Consequences to argue, each of which this package addresses: symbol
+geometry drifts from the published convention with no mechanism to detect it;
+diagrams cannot be regenerated when the underlying model changes, so figure and
+model silently diverge; a diagram is a binary artifact, so it cannot be
+meaningfully diffed or reviewed; and the diagram carries no machine-readable
+model, so the reader cannot recover what was drawn.
+
+\emph{What this paper contributes.} (i) A package that generates ESL diagrams
+from a declarative model. (ii) Dual front ends over one engine, so a model can
+live in a data file or in the document. (iii) A fidelity method that separates
+what can be checked exactly from what can only be checked within measurement
+tolerance, and does both automatically. (iv) A shared model format with a
+simulation kernel.
+
+\section{Background: the Energy Systems Language}
+\label{sec:background}
+
+\subsection{Origins and purpose}
+
+[OUTLINE] Odum developed ESL from the 1950s onward, grounding it deliberately in
+electrical circuit schematics \citep{odum1971,odum1994}. The grounding is the
+point: a circuit schematic is not decoration but a statement about conserved
+quantities, and the analogy was meant to carry that discipline into ecology.
+Each symbol denotes a class of process with defined behaviour --- storage,
+production, consumption, interaction, exchange --- and each pathway a flow.
+
+Say why he thought it necessary. Odum's recurring complaint was that scholars
+were building mathematical models of systems which were energetically invalid:
+formally well-posed, numerically tractable, and impossible. A notation whose
+symbols carry thermodynamic commitments was intended to make such models harder
+to write down.
+
+\subsection{Prior tooling, and the distribution problem}
+\label{sec:tooling}
+
+[OUTLINE] Trace why the notation never acquired reliable tooling. ESL symbol
+sets have circulated as stencils and templates for general-purpose drawing
+programs --- Microsoft Visio, CorelDRAW, Adobe Illustrator --- which are
+proprietary, individually licensed, and store diagrams in closed formats. Cost
+and format both bear on who can participate and on whether a published figure
+can be regenerated. More recently draw.io offered an open, browser-based
+alternative.
+
+Report the author's own attempt, because its failures motivated this work: an
+ESL template built in draw.io at the request of Charles A.\ Hall for his
+doctoral students.\footnote{% [PLACEHOLDER] Repository URL for the draw.io ESL
+% template, and the form of acknowledgement Hall would prefer.
+Repository reference to be added.} Two things went wrong, and neither was
+technical. Distribution reached one research group and stopped, because a
+template is a file rather than a package with a registry behind it. And the
+template could validate nothing: it drew whatever was dragged onto it.
+
+
+Draw the general conclusion: a symbol library needs no semantics, so nobody
+building one is forced to supply any. That is why the recurring difficulty has
+been maintaining and distributing a standard symbol set, and why the notation's
+implied rules have stayed implicit for fifty years.
+
+\section{Related work}
+\label{sec:related}
+
+[OUTLINE] Tell the tooling history, because it explains why the problem has
+persisted. ESL symbol sets have been distributed as stencils and templates for
+proprietary drawing tools --- Microsoft Visio, CorelDRAW, Adobe Illustrator ---
+whose cost and closed formats limit both access and reproducibility. More
+recently draw.io offered an open, web-based alternative, and the present author
+built an ESL template in it at the request of Charles A. Hall for his doctoral
+students. That exercise motivated this package, and its two failures are
+instructive: distribution was limited to one research group, and the template
+could not validate anything it drew. Maintaining and distributing a standard
+symbol set has proven the recurring difficulty.
+
+Position against: general diagramming tools (Inkscape,
+\textsc{OmniGraffle}) --- expressive, not reproducible, no domain semantics;
+\TeX{} drawing packages (TikZ, PSTricks) --- reproducible but with no ESL
+vocabulary, so every author re-derives the symbols; systems-dynamics tools
+(Stella, Vensim, Insight Maker) --- these do carry model semantics and can draw,
+but in their own notation rather than Odum's, and their output is not
+typeset-quality nor \LaTeX-native; and existing emergy tools, which mostly
+compute rather than draw. The gap: nothing renders \emph{Odum's} notation from a
+model, reproducibly, inside a document.
+
+\section{ESL as an informal language with convention-based syntax and semantics}
+\label{sec:informal}
+
+[OUTLINE] This section carries the paper's central claim, and it should come
+before the implementation rather than after it.
+
+\subsection{A semiotic frame}
+\label{sec:semiotics}
+
+[OUTLINE] Borrow Morris's trichotomy \citep{morris1938} to say precisely what
+ESL has and lacks, because ``informal'' on its own is too blunt.
+
+\emph{Syntactics} --- the relations among signs. ESL has strong conventions
+here: transformity orders the horizontal axis, dissipation runs downward,
+feedback arcs over the top. None is written down as a rule.
+
+\emph{Semantics} --- the relation of signs to what they denote. This is where
+ESL is strongest: each symbol has a defined process meaning, and Odum is
+explicit about it.
+
+\emph{Pragmatics} --- the relation of signs to their users. Also strong, and
+under-acknowledged: ESL is drawn to be argued over in seminars, and its
+conventions serve legibility as much as denotation.
+
+The gap is therefore specifically syntactic. Goodman's conditions on notational
+systems \citep{goodman1976} sharpen the diagnosis: a notation requires syntactic
+disjointness and finite differentiation --- one must be able to decide whether
+two inscriptions are instances of the same character. ESL fails this for
+\emph{position}, which carries meaning but has no defined scale, while passing
+comfortably for its symbols. Moody's evaluation of visual notations
+\citep{moody2009} supplies the vocabulary for the rest, and Harel's argument
+that visual formalisms can be as rigorous as textual ones \citep{harel1988}
+establishes that the gap is contingent, not inherent. Bertin
+\citep{bertin1983} supplies the account of position as a visual variable.
+
+Frame the contribution accordingly: we are not proposing that ESL be replaced
+by a formal language, but that its existing conventions be stated precisely
+enough to be implemented and checked --- and we report what happens when one
+tries.
+
+ESL is a graphical language but not a formal one. It has no grammar and no
+stated semantics, so a diagram cannot be checked, and a tool cannot be written
+against a specification --- only against custom. That is why every previous
+attempt has been a symbol library for a general-purpose drawing tool
+(\S\ref{sec:related}) rather than a language implementation: a symbol library
+needs no semantics.
+
+Building a renderer removes that option. Placing a node requires deciding what
+position \emph{means}; validating one requires deciding what a well-formed
+diagram \emph{is}. The decisions below were forced by implementation, and
+stating them is the contribution --- not because they are the only possible
+answers, but because they are currently unstated anywhere.
+
+\subsection{What the implied syntax asserts, and what it leaves open}
+
+[OUTLINE] Transformity orders the horizontal axis: low quality left, high
+quality right. That much is consistently observed in Odum's figures and stated
+informally in the literature. What is \emph{not} stated is the scale. Placement
+is plainly not linear --- transformity spans orders of magnitude --- and a
+logarithmic axis would assert a metric the language never defines.
+
+Argue for the answer this package implements: placement is \emph{ordinal}.
+Distinct transformity values are ranked and mapped to evenly spaced columns.
+This encodes exactly what the syntax claims, the ordering, and nothing further.
+Nodes of equal transformity share a column, which makes a column an equivalence
+class of energy quality.
+
+The vertical axis is the harder question. Consider first, and reject, the
+obvious candidate: that height encodes power, the capacity to do work, with
+dissipated heat low and forcing functions high.
+
+The objection is dimensional. Transformity is emergy per unit available energy,
+so along a transformation chain, where emergy is carried forward and available
+energy is degraded, transformity rises precisely \emph{because} power falls;
+empower is approximately conserved. Available power is therefore already
+determined --- inversely --- by horizontal position. Encoding it again on the
+vertical axis would be redundant where the two agree and contradictory where
+they do not, which is exactly the double-encoding Bertin warns against
+\citep{bertin1983}. Odum's own figures confirm it: the Sun, by far the largest
+power input to an ecosystem, is drawn at the \emph{bottom} of the source column,
+not the top.
+
+The reading that survives is simpler, and unifies the two axes. The vertical
+carries the same quality ordering as the horizontal, applied \emph{relative to
+the main chain} rather than absolutely: a component of higher transformity than
+the chain node it connects to sits above it --- a high-quality input, a
+controller, or a higher-quality product --- and degraded output sits below. The
+energy hierarchy therefore runs from bottom-left to top-right rather than simply
+left to right, and the Sun's position at the bottom of the source column is the
+same rule operating where the horizontal axis cannot separate components that
+all lie outside the frame.
+
+Report the two tests, because the claim is falsifiable and was tested rather
+than asserted. Stripping every hand-placed coordinate from the aggregated
+economy, the layout engine raises the high-transformity fuel source above the
+chain unprompted, reproducing Odum's placement of Fuels and Minerals entering
+from the top. Stripping both coordinates and hand-written layer annotations from
+a second model, the rule recovers the author's \texttt{decomposition}
+annotation on a waste store from transformity alone.
+
+Note one refinement the tests forced: the chain is built from energy pathways
+only. Counting material pathways let a waste store capture the chain and sit on
+the axis, when a flow of degraded material to a decomposition store is precisely
+a side branch --- the same distinction that exempts material flows from the
+quality check in \S\ref{sec:validity}, arrived at independently.
+
+Note the apparent anomaly and dissolve it: the heat sink sits at bottom centre,
+which looks like a violation of the horizontal ordering. It is not, because the
+ground carries no transformity at all --- it is a terminator, not a component.
+Dissipation going down is the vertical convention, not an exception to the
+horizontal one.
+
+\subsection{A worked anomaly: the ground symbol}
+\label{sec:ground}
+
+[OUTLINE] Use the package to settle a question about the notation, which is the
+method this paper is arguing for: a diagram whose rules are implemented can be
+interrogated by drawing.
+
+The apparent anomaly: if the horizontal axis orders components by transformity,
+the heat sink at bottom centre is a violation, because dissipated energy is the
+lowest quality in the system and belongs at the far left.
+
+The resolution: the ground is not a component. It carries no transformity, takes
+no part in the quality ordering, and terminates pathways rather than
+transforming anything. Figure~\ref{fig:ground} shows the same three components
+with dissipation drawn, and the ground sitting outside the ordering entirely.
+Dissipation running downward is the vertical convention doing its work; the
+horizontal axis is untouched.
+
+\begin{figure}[htbp]
+\centering
+\begin{energese}[scale=0.85]
+    \esmeta{column_spacing=3.2, row_spacing=1.6}
+    \esnode{sun}{source}     {Tr=1,    label={Sun}}
+    \esnode{grass}{producer} {Tr=100,  label={Grass}}
+    \esnode{cow}{consumer}   {Tr=2000, label={Cow}}
+    \esflow{sun}{grass}{energy}
+    \esflow{grass}{cow}{energy}
+\end{energese}
+\caption{Three components ordered left to right by transformity, with their
+dissipation pathways converging on a single ground. The ground carries no
+transformity and is placed by neither rule: it terminates the diagram rather
+than occupying a position in it. The pathways converge as a delta and not as a
+spray: how far each drops before turning in is ordered by its distance from the
+trunk, so the furthest runs below and outside the nearest all the way to the
+junction they share. Two dissipation pathways that cross read as pathways
+meeting where nothing joins.}
+\label{fig:ground}
+\end{figure}
+
+Generalise the move: three node types --- \texttt{ground}, \texttt{text} and
+\texttt{box} --- are annotations or terminators rather than components, and are
+exempt from carrying transformity. Making that exemption explicit is what
+dissolves the anomaly, and it is the kind of distinction an implementation
+forces and a drawing tool never would.
+
+\subsection{Validity, and where it stops}
+\label{sec:validity}
+
+[OUTLINE] Odum's stated motivation for ESL was that scholars build mathematical
+models which are energetically invalid; the language was grounded in circuit
+schematics to help them avoid it. Drawing tools cannot help, because they render
+whatever is drawn.
+
+Set out what a renderer \emph{can} check without leaving the diagram: quality
+does not fall along an energy pathway; sources take no inflow and grounds emit
+none; every component is reachable from a source; energy that arrives leaves,
+as outflow or as dissipation. These are topological, need no quantities, and
+correspond directly to Odum's complaint.
+
+Then set out the boundary, which matters as much as the checks:
+
+\begin{itemize}
+  \item \emph{Material pathways are exempt from the quality rule.} Degraded
+        material moving to a waste or decomposition store genuinely falls in
+        transformity --- that is what decomposition is. Applying the rule to
+        material flows produced a false positive on one of the package's own
+        test models, which is worth reporting as evidence that the distinction
+        is real rather than stipulated.
+  \item \emph{Conservation is not checked.} Balancing inflow against outflow
+        needs quantities, and a diagram carries none. That is the seam with a
+        simulation kernel (\S\ref{sec:gssk}).
+  \item \emph{Emergy is out of scope entirely.} The algorithms are not
+        standardised and there is no formal definition to validate against, so
+        a check would assert a standard that does not exist. The package
+        represents the pre-emergy form of these models; the dual energy/emergy
+        depiction of Valyi's emergy simulator is not supported.
+\end{itemize}
+
+Report the finding honestly: the quality check caught a genuine error in this
+paper's own worked example, where an interaction fed by a transformity-1000
+source had been given a transformity of 500.
+
+\section{Design}
+\label{sec:design}
+
+\subsection{One model, two front ends}
+
+The central design constraint is that there is exactly one model and one
+renderer. A system is described by nodes, edges and metadata. That description
+may be written as JSON, for models that live outside the document or are
+generated by a simulation, or directly in \TeX, for diagrams that belong with
+their prose. Both are parsed into the same Lua table and rendered by the same
+code.
+
+Figure~\ref{fig:frontends} shows the same system expressed both ways.
+
+\begin{figure}[htbp]
+\begin{minipage}[t]{0.48\textwidth}
+\begin{lstlisting}[title=JSON]
+{"metadata": {"column_spacing": 3.0},
+ "nodes": [
+  {"id":"sun",   "type":"source",
+   "Tr":1,    "label":"Sun"},
+  {"id":"grass", "type":"producer",
+   "Tr":100,  "label":"Grass"},
+  {"id":"cow",   "type":"consumer",
+   "Tr":2000, "label":"Cow"}],
+ "edges": [
+  {"from":"sun","to":"grass",
+   "type":"energy"},
+  {"from":"grass","to":"cow",
+   "type":"energy"}]}
+\end{lstlisting}
+\end{minipage}\hfill
+\begin{minipage}[t]{0.48\textwidth}
+\begin{lstlisting}[title=\TeX]
+\begin{energese}
+  \esmeta{column_spacing=3.0}
+
+  \esnode{sun}{source}
+         {Tr=1,    label={Sun}}
+  \esnode{grass}{producer}
+         {Tr=100,  label={Grass}}
+  \esnode{cow}{consumer}
+         {Tr=2000, label={Cow}}
+
+  \esflow{sun}{grass}{energy}
+  \esflow{grass}{cow}{energy}
+\end{energese}
+\end{lstlisting}
+\end{minipage}
+
+\vspace{1em}
+\centering
+\begin{energese}[scale=0.8]
+  \esmeta{column_spacing=3.0, row_spacing=1.5}
+  \esnode{sun}{source}     {Tr=1,    label={Sun}}
+  \esnode{grass}{producer} {Tr=100,  label={Grass}}
+  \esnode{cow}{consumer}   {Tr=2000, label={Cow}}
+  \esflow{sun}{grass}{energy}
+  \esflow{grass}{cow}{energy}
+\end{energese}
+
+\caption{The same system in both front ends, and the diagram they produce. The
+figure is rendered by the package as this paper is typeset. Equivalent models
+are verified to rasterise identically (\S\ref{sec:parity}).}
+\label{fig:frontends}
+\end{figure}
+
+\subsection{Routing}
+
+[OUTLINE] Make the semantic point first, because it is easy to mistake for a
+cosmetic one. In ESL a pathway meeting a symbol denotes flow entering that
+symbol. A pathway drawn across an unrelated symbol therefore asserts a
+connection the model does not contain --- it is a false statement, not an
+untidy one. Drawing the pathway on a lower layer so it passes behind the symbol
+does not help: it still reads as flow into the symbol, and merely hides the
+evidence. The pathway has to move.
+
+Describe the router: a pathway takes the shortest route that avoids every
+symbol which is not its own endpoint, found as a shortest path through a
+visibility graph over the corners of the obstacles, inflated by the clearance a
+pathway keeps. For rectangular obstacles that path is \emph{the} shortest one
+available, since a taut string around boxes bends only at their corners.
+Waypoints are joined by curves whose tangents follow the chord through each
+point, so the pathway is continuous in tangent at every waypoint and flows
+through a detour rather than turning a corner at it.
+
+Worth saying why the obvious cheaper thing does not work, because it is what
+this replaced: stepping over one offending symbol at a time, to whichever side
+deviates less, is greedy in the ordinary sense and wrong in the ordinary way ---
+clearing the first obstacle by the smaller deviation regularly pushes the
+pathway into a second, and what comes out of a crowded middle is a staircase of
+local decisions with no claim to being short.
+
+One further distinction that costs a paragraph and is invisible until it is
+wrong: what must clear the symbol is the \emph{curve}, not the polyline the
+router returns. The drawn curve cuts the corners the polyline turns at, so a
+polyline that clears an obstacle by a hair produces a pathway that crosses it.
+The router therefore tests the curve it is about to hand to Ti\emph{k}Z, and
+widens the corners it bends around until the curve clears too.
+
+Note the limitation honestly: obstacle extents are estimated from the grid and a
+per-character label estimate, because the layout engine runs in Lua and cannot
+know what \TeX{} will typeset. The estimate is not merely the label's width ---
+each shape declares what fraction of its outline the text may occupy, and a
+labelled symbol is wider than its label by exactly that factor. Exact extents
+would still require round-tripping node dimensions through the \texttt{.aux}
+file.
+
+\subsection{Labels on pathways}
+
+[OUTLINE] A flow's quantity is content, and a quantity written across a symbol,
+across another pathway, or across the system frame is content the reader cannot
+recover --- worse when it lands between two pathways and they have to guess
+which it belongs to. Each label is placed by scoring the positions Ti\emph{k}Z
+can express for a node on a path --- a fraction along it, above or below, at one
+of a few distances clear --- against the symbols, the pathways sampled as the
+curves they will be drawn as, the dissipation bundle, the frame, and the labels
+already placed.
+
+Argue for enumeration over the annealing the graph-drawing literature reaches
+for. Two reasons, and the second is the stronger. Reproducibility: a golden
+image is only a test if the same input renders identically, and a randomised
+search would have to carry a seed and would still move every label whenever
+anything upstream of it changed. And expressibility: the candidate set is not a
+discretisation of a continuous space, it \emph{is} the set of placements
+Ti\emph{k}Z can express relative to a path. A position it cannot express has to
+be given absolutely, and an absolutely-placed label stops travelling with its
+pathway the moment the layout moves.
+
+Report the residue honestly. Where two symbols stand closer together than the
+label is wide, no candidate is clear and the search returns the least bad one;
+Figure~\ref{fig:complex-json} has such a case, where a quantity sits on the
+system frame because every alternative sits on a symbol. The placement is also
+approximate in the same way the extents are: Lua scores the label against the
+pathway between two node boundaries, while \TeX{} draws it against the pathway
+between two ports.
+
+\subsection{Layout}
+
+[OUTLINE] Explain the two axes and why they are chosen this way.
+
+Horizontal position derives from transformity: distinct $Tr$ values are sorted
+and assigned to columns, so horizontal position expresses energy quality rather
+than declaration order --- which is the convention readers of ESL already apply.
+Vertical position uses a central spine: the longest chain of energy and material
+pathways is laid on the axis, and remaining nodes are distributed above and
+below their column's spine. Explain why automatic layout matters here: it is
+what makes a diagram a \emph{function} of its model rather than an artifact
+maintained alongside it. Note the escape hatch --- explicit coordinates override
+either axis independently, so one awkward component does not force abandoning
+the layout.
+
+Then the exception, which is a claim about the notation rather than about
+layout. An interaction is not an independent component: it is where two flows
+combine on their way into the thing they drive, and Odum draws it against that
+thing. Given a column of its own by its transformity, it drifts away from the
+component it modifies and the reader loses which one that is. Interactions and
+standalone transactions are therefore children in a compound graph --- locked to
+a parent by a fixed offset, and exempt from the column algorithm, so they
+neither claim a column nor push a sibling out of a row. The offset follows the
+flow: a child that feeds its parent sits upstream of it, one fed by its parent
+sits downstream, because a modifier drawn on the wrong side reverses the
+direction its pathway reads in. The gap is half a column or whatever the two
+symbols need to stand clear of each other, whichever is larger --- a labelled
+exchange diamond is wide, and a fixed fraction of the column buries its left
+vertex inside the consumer it belongs to.
+
+\subsection{The system window}
+
+[OUTLINE] The frame declares what the model treats as inside the system, so
+what it encloses is a claim and not a matter of taste. Two rules settle it.
+What is inside: everything but the sources, which is Odum's convention --- a
+source is by definition an input from outside --- overridable per node. And
+where the frame falls: a fixed margin outside the \emph{extents} of what is
+inside, labels included, rather than outside their centres. Measuring centres
+and padding by half a column, as an earlier version did, makes the margin a
+function of the widest symbol in the diagram: the frame crowds a wide producer
+and leaves a hand's width of dead space beside a small storage.
+
+The frame must also leave room underneath for the dissipation bundle, which is
+the part that is easy to miss. The funnel converges \emph{inside} the window and
+only its trunk crosses the frame --- what leaves the system is one aggregate
+flow of used energy, not several, and letting each pathway cross separately both
+shreds the boundary and misstates the accounting. A frame fitted to the symbols
+alone cuts straight across that funnel.
+
+\subsection{Symbols that size to their content, on a common grid}
+
+[OUTLINE] Two rules, and the second is the one that took longest to get right.
+
+\emph{A symbol sizes itself to its label.} Fixed-size symbols are why hand-drawn
+ESL diagrams have labels spilling outside their shapes or shrunk to
+illegibility.
+
+\emph{A symbol keeps its shape while doing so.} Growing to fit a label must be
+uniform: a hexagon widened to swallow a long caption reads as a different
+symbol, and the notation's whole claim is that shape carries meaning. Each shape
+therefore declares its measured aspect ratio and the fraction of its outline the
+text may occupy, and the outline is the smallest size at that ratio which
+contains the label. Where a label will not fit even then, the label is displaced
+rather than the shape distorted. Report the check: consumers carrying a single
+character, one word, a two-line caption, and a magnitude of 1.5 all measure
+between 0.874 and 0.880 against a canonical 0.877.
+
+Note the intermediate version that was wrong, because it is instructive: capping
+how far a label could flatten a symbol merely bounded the distortion instead of
+removing it, and the resulting hexagons still read as squashed. Each symbol here
+derives its geometry from its own label and grows the outline around it.
+
+Then the complication, which is the interesting part. Each shape grows from its
+label at a \emph{different} rate, because each encloses a rectangle differently:
+a producer's height is twice the label's half-height, a consumer's is $3.23$
+times, an amplifier's $5.2$ times. Sizing each symbol independently therefore
+makes identical labels produce wildly different symbols --- which looks like a
+rendering fault but is a direct consequence of the geometry.
+
+The resolution is a grid. A single unit, \verb|\energeseunit|, sets a floor for
+every symbol, and each symbol's floor is the multiple of that unit at which its
+bare form lands on the relative height Odum draws it at
+(Table~\ref{tab:conformance}). Short labels fall inside the floor, so every
+symbol sits on the grid; a label too large for its cell grows its own symbol,
+which is the only way to keep the text readable. The grid is never drawn.
+
+State that this is asserted, not asserted-to: rendered heights agree with Odum's
+measured ratios to within $0.02$.
+
+\section{Method: making fidelity checkable}
+\label{sec:method}
+
+This is the methodological contribution and the section to write most carefully.
+
+\subsection{Why ``pixel-perfect'' needs defining}
+
+[OUTLINE] The obvious formulation --- compare our output to Odum's published
+figures pixel by pixel --- is not a well-posed test, and saying so precisely is
+part of the contribution. The available references are $144$\,dpi captures of
+printed figures in which individual symbols span $31$--$107$ pixels. At that
+resolution a linear dimension is recoverable to roughly $1$--$3\%$; stroke
+weight, curve control points and joins are not recoverable at all. The captures
+also carry scanner artifacts and, in one case, visible show-through from the
+reverse of the page. Any threshold that ``passed'' such a comparison would be
+measuring noise. Cite this as a general problem for reproducing figures from the
+printed literature.
+
+\subsection{Two tiers}
+
+We therefore separate two questions that are usually conflated.
+
+\emph{Tier 1, regression:} has the output changed? The reference is the
+package's own approved output. Rendering is deterministic --- verified: rasters
+are byte-identical between runs, and with \texttt{SOURCE\_DATE\_EPOCH} pinned
+the PDFs are too --- so any difference at all is a real change, and comparison
+is exact. A changed render fails the build and writes a three-panel diff.
+Accepting a change is explicit and versions the new reference alongside the code.
+
+\emph{Tier 2, conformance:} is the output right? Here the reference is Odum's
+published symbol sheet, and the assertions are scale-independent geometric
+invariants measured from it, with tolerances no tighter than the measurement
+precision justifies.
+
+Tier 2 establishes that a symbol is correct; Tier 1 ensures it stays correct.
+
+\subsection{Measuring the reference}
+
+[OUTLINE] Describe the extraction and why the naive approach fails. Odum draws
+each symbol with inflow, outflow and heat-sink arrows attached, so a bounding
+box around the ink measures the arrows too. We instead flood-fill each symbol's
+interior from a seed point: the outline is closed and the arrows lie outside it,
+so the filled region is the symbol body alone. Seed points are the only manual
+input; everything downstream is measured and re-derivable.
+
+State the internal validation: the source symbol is a circle, and the procedure
+recovers an aspect ratio of $0.984$ against a true value of $1$. That $1.6\%$
+error is an empirical estimate of the method's precision, and it sets the floor
+for every tolerance in Table~\ref{tab:conformance}.
+
+\subsection{Results}
+
+\begin{table}[htbp]
+\centering
+\begin{tabular}{lrrrrrr}
+\toprule
+& \multicolumn{2}{c}{Aspect ratio} & \multicolumn{2}{c}{Interior overlap}
+& \multicolumn{2}{c}{Height / producer} \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-7}
+Symbol & Ref. & Rend. & IoU & Min. & Ref. & Rend. \\
+\midrule
+source        & 0.984 & 1.000 & 0.982 & 0.93 & 1.016 & 1.015 \\
+storage       & 0.968 & 1.007 & 0.901 & 0.85 & 1.000 & 1.000 \\
+producer      & 1.726 & 1.701 & 0.990 & 0.94 & 1.000 & 1.000 \\
+consumer      & 0.877 & 0.879 & 0.966 & 0.92 & 1.306 & 1.299 \\
+transaction   & 2.226 & 2.130 & 0.669 & 0.63 & 0.500 & 0.515 \\
+interaction   & 1.886 & 1.844 & 0.934 & 0.89 & 0.565 & 0.575 \\
+gain          & 0.917 & 0.925 & 0.919 & 0.87 & 0.581 & 0.597 \\
+loop\_limited & 1.019 & 1.017 & 0.962 & 0.91 & 0.855 & 0.858 \\
+switch        & 1.036 & 1.033 & 0.922 & 0.87 & 0.903 & 0.910 \\
+\bottomrule
+\end{tabular}
+\caption{Three independent invariants for each symbol. Aspect ratio is width over
+height of the symbol's interior. Interior overlap is intersection-over-union of
+the enclosed regions after normalisation --- interiors rather than outlines, so
+the measure is independent of stroke weight. Thresholds are the measured
+agreement less $0.05$, so each reflects what that symbol pair actually achieves.
+Height is relative to the producer, and is what the grid guarantees. The
+exchange diamond is the weakest: at $31$ pixels tall the reference's own stroke
+consumes much of its interior, which caps the achievable overlap.}
+\label{tab:conformance}
+\end{table}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth]{compare-all.png}
+\caption{Odum's published symbol (left of each pair) beside the package's
+rendering (right). The reference panels are cropped by the same flood-fill that
+produced the measurements in Table~\ref{tab:conformance}, so the figure shows
+exactly what was measured. Each pair is scaled to a common height so that shape
+can be compared; stroke weight therefore cannot be, since a symbol spanning
+$31$ pixels in the source is magnified far more than one spanning $107$.}
+\label{fig:sidebyside}
+\end{figure}
+
+\subsection{A worked case: the method finding a defect}
+\label{sec:defect}
+
+[OUTLINE] This is the strongest evidence that the method does work, and it
+should be reported honestly rather than smoothed over.
+
+During development the consumer symbol was implemented as a hexagon pointed left
+and right, from a reading of the full symbol sheet at its native resolution. The
+existing test suite --- nine compile-and-check suites --- passed throughout,
+because compiling successfully says nothing about shape. The conformance
+measurement put the rendered symbol at an aspect ratio of $1.435$ against a
+reference of $0.877$: the symbol is in fact pointed top and bottom with vertical
+sides, through which energy enters and leaves. Correcting the topology brought
+the rendering to $0.876$.
+
+Points to draw out: a compile-only test suite cannot detect a wrong symbol; the
+error survived visual inspection of the rendered diagrams because a hexagon
+looks plausible either way; and the defect was found by measurement, not by
+looking harder. Generalise this to reproducible-figure practice.
+
+\subsection{Front-end equivalence}
+\label{sec:parity}
+
+[OUTLINE] Describe the property and how it is enforced. Because both front ends
+are claimed to be interchangeable, the claim is tested rather than asserted:
+equivalent models are rendered through each path, rasterised and compared
+exactly. Report that this check found a real defect --- the JSON path was
+emitting stray spaces that padded every diagram's bounding box by
+approximately $36$\,pt, invisible in isolation and detectable only by comparison.
+
+\subsection{A complete model in both front ends}
+\label{sec:complex}
+
+Figure~\ref{fig:frontends} is deliberately small. Figure~\ref{fig:complex-tex}
+gives a complete published diagram --- Odum's aggregated economy --- authored in
+\TeX, and Figure~\ref{fig:complex-json} the same model as JSON. Both listings are
+included directly from the repository's example files, so they cannot drift from
+what is tested; and \texttt{make parity} asserts that the two render identically.
+
+Between them they exercise every feature the package has: manual coordinates
+where transformity alone will not place a node, a system window, a relocated
+heat sink, interaction symbols, bent pathways, and several money-feedback arcs.
+
+Two modelling choices in this figure are worth stating, because neither is
+forced by the source and a reader comparing the two will notice.
+
+\emph{Interaction symbols are made explicit.} Odum draws a notched shape abutting
+the left of each consumer, where separate inflows must combine before they can
+be used. That notch is an interaction, not decoration on the consumer, so it is
+modelled here as its own node --- \texttt{ix\_industry} and
+\texttt{ix\_consumer}. Making it a node rather than an ornament is what lets the
+model say which flows combine, which is the semantic content the notch carries.
+
+\emph{Exchanges are modelled as single transactions, not as two pathways.} In
+the original, money and energy meet at exchange diamonds: a purchase is one
+transaction with an energy side and a money side. Declaring those as independent
+pathways that happen to pass near a diamond would render similarly and assert
+something weaker --- that a payment and a delivery both occurred, rather than
+that they are the same event. A transaction node here names a seller and a
+buyer, and the four half-pathways are generated from it. Note the design
+consequence worth stating: because generation happens before validation, the
+synthesised legs are checked and routed exactly like declared ones, so the
+construct adds expressiveness without adding a special case anywhere downstream.
+
+\begin{figure}[htbp]
+\lstinputlisting[linerange={7-36}]{../examples/aggregated-economy-native.tex}
+\caption{The aggregated economy authored in \TeX{}
+(\texttt{examples/aggregated-economy-native.tex}).}
+\label{fig:complex-tex}
+\end{figure}
+
+\begin{figure}[htbp]
+\lstinputlisting[basicstyle=\ttfamily\scriptsize]{../examples/aggregated-economy.json}
+\caption{The same model as JSON (\texttt{examples/aggregated-economy.json}).
+Key names are identical to the \TeX{} form; only the syntax differs.}
+\label{fig:complex-json}
+\end{figure}
+
+\begin{figure}[htbp]
+\centering
+\begin{subfigure}{\textwidth}
+\centering
+\includegraphics[width=0.86\textwidth]{aggregated-economy.png}
+\caption{Odum's published figure.}
+\end{subfigure}
+
+\vspace{1em}
+\begin{subfigure}{\textwidth}
+\centering
+\includegraphics[width=0.86\textwidth]{diagram-aggregated-economy.png}
+\caption{Rendered by the package from either listing above.}
+\end{subfigure}
+\caption{A complete diagram beside its source. The system window frames what the
+model treats as inside the system; dissipation pathways converge on a single
+ground symbol placed outside it, because used energy leaves the system.}
+\label{fig:complex-compare}
+\end{figure}
+
+\subsection{Division of responsibility}
+\label{sec:raci}
+
+[OUTLINE] State plainly where each obligation sits, because a reader deciding
+whether to trust a figure needs to know what the renderer did and did not
+check. The blunt version, which belongs in the paper verbatim: \emph{if the
+model is energetically invalid, so is the diagram.} The package renders
+faithfully; it does not repair.
+
+\begin{table}[htbp]
+\centering
+\begin{tabular}{lll}
+\toprule
+Concern & Answerable & Notes \\
+\midrule
+Symbol geometry and conformance  & this package & measured against Odum's sheet \\
+Placement conventions            & this package & \S\ref{sec:informal} \\
+Topological energetic validity   & this package & four checks, \S\ref{sec:validity} \\
+Model schema and identity        & shared       & one format, two implementations \\
+Quantities and conservation      & GSSK         & the diagram carries no flux \\
+Dynamics and simulation          & GSSK         & \\
+Emergy accounting                & neither      & no agreed algorithm exists \\
+Scientific validity of the model & the author   & no tool can supply this \\
+\bottomrule
+\end{tabular}
+\caption{Where each obligation sits. The rows the package does not own matter as
+much as those it does: a renderer that appeared to validate quantities would be
+worse than one that plainly does not.}
+\label{tab:raci}
+\end{table}
+
+Argue the last row rather than leaving it implicit. Odum's complaint was about
+scholars, not software, and no amount of checking makes a model true. What
+tooling can do is refuse to let one class of error pass silently, and be
+explicit about which class that is.
+
+\section{Using the package}
+\label{sec:usage}
+
+\subsection{Installation and invocation}
+[OUTLINE] CTAN installation; the three authoring paths; a minimal complete
+document.
+
+\subsection{Model reference}
+[OUTLINE] Node keys, edge keys, metadata keys, condensed to a table. Note that
+key names are identical in both front ends by design.
+
+\subsection{Naming and labelling}
+[OUTLINE] Odum names symbols as well as describing them --- storages $Q_1,
+Q_2, \ldots$, sources and flows $X$ and $J$ --- and both names carry
+information: the short one is what the accompanying equations refer to, the long
+one is what a reader needs. The package holds both, and
+\texttt{label\_mode} selects which goes inside the symbol.
+
+Make the argument for automatic displacement: a symbol sizes itself to its
+label, but a label larger than the symbol's grid cell would stop it reading as
+the cell it occupies --- the very inconsistency the grid exists to remove. Such
+a label is therefore placed outside the symbol and, because it is then part of
+what the diagram occupies, joins the obstacle set the router avoids.
+
+\subsection{Ports, and the escape hatch}
+[OUTLINE] The symbols are ordinary Ti\emph{k}Z shapes with documented
+connection points, so a diagram that wants no automatic layout can be drawn by
+hand and still use the correct symbols. Publishing those points is what makes
+the package composable.
+
+A symbol's connection points are a ring spaced a constant distance apart along
+its outline (Figure~\ref{fig:anchors}), and they are its \emph{ports}: a
+pathway attaches to one of them and to nothing else. The named anchors ---
+\texttt{energy\_in}, \texttt{money\_out}, \texttt{heat\_sink} --- name a
+\emph{direction} rather than a second, independent set of points: they say where
+a kind of flow belongs, because that is where Odum draws it, and the pathway
+attaches at the port nearest that direction. Making the two sets one is what
+lets the renderer say anything about occupancy at all.
+
+Argue why the ring is spaced by distance rather than by angle. Equal angular
+divisions would put connection points further apart on a large symbol than on a
+small one, so a coupled pair --- goods and money running together into the same
+component --- would separate by a different amount at each symbol it met, and
+the coupling would read inconsistently across one diagram. Constant spacing
+makes the gap a property of the diagram rather than of the symbol, at the cost
+of a variable number of ports per symbol, which is the right trade. The count is
+rounded to a multiple of four so that a port falls on each axis, where Odum's
+flows meet a symbol; that costs up to a quarter of the pitch in spacing and buys
+an \texttt{energy\_in} that lands on the notch of an interaction rather than
+half a pitch up its edge.
+
+[OUTLINE] Then the occupancy rule, which is a claim about the diagram and not
+about the drawing: \textbf{a port holds one pathway}. Two flows attached at the
+same point are drawn as one line leaving the symbol, and the reader cannot
+recover how many there were or which the arrowhead belongs to --- the diagram
+asserts less than the model contains. So the second pathway to want a port takes
+the next one along, on the side it approaches from. Note what this costs: the
+attachment point is no longer a property of the symbol alone but of the symbol
+and everything attached to it, so the allocation has to be independent of the
+order the model happens to list its edges in --- our own two front ends list the
+same diagram's exchanges in a different order, and \texttt{make parity} caught
+it. Serving the pathways in the order of the directions they run off in, from
+the middle of each fan outwards, is both order-independent and the condition for
+a fan not to cross itself on the way out.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.78\textwidth]{contact-sheet.png}
+\caption{The implemented symbols with their ports: points spaced a constant
+distance apart \emph{along the outline}, so a large symbol carries more of them
+than a small one and a coupled pair attaching at adjacent indices is separated
+by the same distance whichever symbol it meets. A pathway attaches to one of
+these and to nothing else, and to one of them at a time; a named anchor such as
+\texttt{energy\_in} resolves to the port nearest the direction it names. The
+figure is rendered by the test suite, so a port that drifts off its outline is
+caught --- which is how the switch's were found to sit up to a fifth of the
+radius outside the bowed sides.}
+\label{fig:anchors}
+\end{figure}
+
+\section{Interoperability with GSSK}
+\label{sec:gssk}
+
+[OUTLINE] Argue the payoff: a diagram and a simulation should not be two
+independent descriptions of one system, because they will diverge.
+
+GSSK (General Systems Simulation Kernel) takes a JSON model and integrates it.
+Its schema and this package's arrived at nearly the same shape independently:
+both use \texttt{metadata}, \texttt{nodes} and \texttt{edges}; and GSSK's node
+type vocabulary --- \texttt{source}, \texttt{storage}, \texttt{sink},
+\texttt{constant}, \texttt{interaction}, \texttt{gain}, \texttt{loop\_limited},
+\texttt{exchange}, \texttt{switch}, \texttt{producer}, \texttt{consumer},
+\texttt{misc\_box}, \texttt{system\_frame} --- is Odum's symbol set. The
+convergence is not coincidence: both are formalising the same language.
+
+Describe the alignment (\S\ref{sec:gssk} of the design note): energese reads
+GSSK models directly, taking topology from the shared fields and presentation
+from GSSK's \texttt{visual} object, which its schema already reserves and its
+kernel ignores. The result is a single file that both simulates and draws, so a
+published figure is generated from the model that produced the results beside
+it.
+
+\subsection{Round-tripping a visual editor}
+\label{sec:roundtrip}
+
+[OUTLINE] Make the case that automatic layout must be optional, not mandatory.
+A modeller working in a drag-and-drop editor such as GSSK-Dia has already made
+every placement decision, and a renderer that re-derives them publishes
+something other than what was drawn.
+
+The package therefore accepts geometry from the model at both levels: explicit
+\texttt{x} and \texttt{y} on a node override the layout engine per axis, and
+\texttt{waypoints} on an edge override the router. An editor can emit a model
+that renders exactly as drawn, while a hand-written model carrying no geometry
+gets the full layout treatment --- and the two mix freely, so a modeller may
+place the components that matter and leave the rest to the engine.
+
+State the consequence for the seam: the shared format then carries both the
+simulation model and its visual presentation, which is what makes one file
+sufficient for simulating and for publishing.
+
+Adopting the shared vocabulary is what made the remaining symbol set explicit
+rather than a matter of taste: GSSK names \texttt{gain}, \texttt{loop\_limited}
+and \texttt{switch}, all three of which are now implemented and measured
+(Table~\ref{tab:conformance}).
+
+\section{Limitations and future work}
+\label{sec:limits}
+
+[OUTLINE] State plainly what remains, and be careful to claim no more than the
+method supports.
+
+\begin{itemize}
+  \item \emph{Reference precision is the binding constraint.} Every tolerance in
+        Table~\ref{tab:conformance} is set by the $144$\,dpi captures available,
+        not by the renderer. The exchange diamond spans $31$ pixels, and at that
+        size its own stroke consumes much of its interior. Higher-resolution
+        sources would tighten every row, and are the single most valuable
+        addition to this work.
+  \item \emph{Conformance asserts two invariants, not a complete
+        specification.} Aspect ratio and interior overlap together constrain a
+        symbol tightly, but a shape could in principle satisfy both while being
+        wrong in some detail neither captures. The contact sheet remains the
+        human backstop.
+  \item \emph{Some symbols are poor containers for text.} A triangle in
+        particular: fitting the full bounding box of a label would force the
+        amplifier to three times a producer's height, so the package guarantees
+        the label's middle band and lets the extreme corners of the box fall
+        outside. Odum labels amplifiers with a single character; long labels
+        there will look wrong.
+  \item \emph{Automatic layout handles the common cases.} Dense diagrams with
+        many crossing feedback pathways still need per-edge routing, as
+        Figure~\ref{fig:complex-tex} shows.
+  \item \emph{Golden-image regression is engine-bound.} Goldens are only
+        comparable across builds of the same \TeX{} Live, so an upgrade is a
+        deliberate regeneration event rather than a transparent one.
+\end{itemize}
+
+\section{Toward a formal definition}
+\label{sec:future-formal}
+
+[OUTLINE] Where the paper says what should happen next; ambitious but specific.
+
+\emph{A stated syntax.} The conventions implemented here are a candidate, not a
+standard. What is missing is a specification the community has agreed, against
+which independent implementations could be compared --- a position ESL has never
+been in. Propose the checks of \S\ref{sec:validity} and the placement rules of
+\S\ref{sec:informal} as a first draft to be argued with, and note that the
+semiotic diagnosis of \S\ref{sec:semiotics} says where the work is needed:
+syntactics, not semantics.
+
+\emph{Emergy, deferred rather than dismissed.} Emergy --- embodied energy,
+energy memory --- is central to the tradition and absent here. The reason is not
+disagreement with the concept but the absence of an agreed algorithm, and
+validating against a standard that does not exist would be worse than declining
+to validate. Separate the two problems: depiction is tractable independently of
+accounting. Valyi's emergy simulator showed dual energy and emergy flows on one
+diagram,\footnote{% [PLACEHOLDER] Citation for Valyi's emergy simulator (Valyi
+% and Ortega?). The notes describe a dual energy/emergy flow depiction; the
+% bibliographic details need confirming.
+Reference to be confirmed.} which is a notational proposal that could be adopted
+without settling how emergy is computed. That is the next tractable step.
+
+\emph{Quantities.} Conservation checking needs flux, which a diagram does not
+carry. The shared model format (\S\ref{sec:gssk}) is the route, and it makes
+this a question of interoperation rather than of scope creep.
+
+\emph{Barrier to entry.} Return to \S\ref{sec:tooling}. The distribution problem
+was never solved by better drawing tools; it is solved by a package registry, a
+free implementation, and a format other tools can read. Argue that this is why
+reviving the notation is plausible now in a way it was not when the only route
+was a stencil emailed between research groups.
+
+\section{Conclusions}
+\label{sec:conclusions}
+
+[OUTLINE] Return to the opening claim. An ESL diagram is a specification, so it
+should be generated from a model and checked against its notation's conventions.
+The package makes both routine. The wider methodological point --- separating
+exact regression from tolerance-bounded conformance, and being explicit about
+which claim the available reference material can support --- applies to any work
+that reproduces figures from the printed scientific literature.
+
+\section*{Software availability}
+
+[OUTLINE] CTAN package name, repository URL, licence, version, archived DOI.
+Note that every figure in this paper is regenerated by the package's own test
+suite.
+
+\begin{thebibliography}{99}
+
+%% --- The Energy Systems Language -----------------------------------------
+\bibitem[Odum(1971)]{odum1971}
+Odum, H.T., 1971. \emph{Environment, Power, and Society}. Wiley-Interscience,
+New York.
+
+\bibitem[Odum(1994)]{odum1994}
+Odum, H.T., 1994. \emph{Ecological and General Systems: An Introduction to
+Systems Ecology}. University Press of Colorado, Niwot.
+
+\bibitem[Odum(1996)]{odum1996}
+Odum, H.T., 1996. \emph{Environmental Accounting: Emergy and Environmental
+Decision Making}. Wiley, New York.
+
+\bibitem[Brown and Ulgiati(2004)]{brown2004}
+Brown, M.T., Ulgiati, S., 2004. Energy quality, emergy, and transformity:
+H.T. Odum's contributions to quantifying and understanding systems.
+\emph{Ecological Modelling} 178(1--2), 201--213.
+
+%% --- Notation, semiotics, visual formalism --------------------------------
+\bibitem[Morris(1938)]{morris1938}
+Morris, C.W., 1938. \emph{Foundations of the Theory of Signs}. University of
+Chicago Press, Chicago.
+
+\bibitem[Goodman(1976)]{goodman1976}
+Goodman, N., 1976. \emph{Languages of Art: An Approach to a Theory of Symbols},
+2nd ed. Hackett, Indianapolis.
+
+\bibitem[Bertin(1983)]{bertin1983}
+Bertin, J., 1983. \emph{Semiology of Graphics: Diagrams, Networks, Maps}.
+University of Wisconsin Press, Madison.
+
+\bibitem[Harel(1988)]{harel1988}
+Harel, D., 1988. On visual formalisms. \emph{Communications of the ACM} 31(5),
+514--530.
+
+\bibitem[Moody(2009)]{moody2009}
+Moody, D.L., 2009. The ``physics'' of notations: toward a scientific basis for
+constructing visual notations in software engineering. \emph{IEEE Transactions
+on Software Engineering} 35(6), 756--779.
+
+%% --- Implementation --------------------------------------------------------
+\bibitem[Tantau(2023)]{tantau2023}
+Tantau, T., 2023. \emph{The Ti\emph{k}Z and PGF Packages: Manual for Version
+3.1.10}. Available from the Comprehensive TeX Archive Network.
+
+%% -------------------------------------------------------------------------
+%% [PLACEHOLDER] Still to be supplied by the author:
+%%
+%%   \bibitem{valyi}  Valyi's emergy simulator. The notes describe a tool that
+%%       depicted dual energy and emergy flows on one diagram, and note that the
+%%       formalisation of emergy it proposed was not widely adopted. Believed to
+%%       be Valyi & Ortega; volume, year and venue need confirming before use.
+%%
+%%   \bibitem{hallTemplate}  The draw.io ESL template built at the request of
+%%       Charles A. Hall for his doctoral students. Needs the repository URL and
+%%       a date, plus whatever acknowledgement Hall prefers.
+%%
+%%   \bibitem{gssk}  GSSK (General Systems Simulation Kernel). Needs repository
+%%       URL, version and, if one exists, a software citation or DOI.
+%%
+%%   Optionally: a reproducible-research citation supporting the
+%%   figure-provenance argument in section 5, and citations for the
+%%   systems-dynamics tools named in section 3 (Stella, Vensim, Insight Maker).
+%% -------------------------------------------------------------------------
+
+\end{thebibliography}
+
+\end{document}

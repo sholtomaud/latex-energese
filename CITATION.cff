@@ -1,0 +1,48 @@
+# Citation metadata. GitHub reads this file to offer "Cite this repository",
+# and Zenodo reads it when archiving a release.
+#
+# At each release, update `version` and `date-released`, and add the new
+# version DOI under `identifiers`. The `doi` below is the concept DOI: it
+# always resolves to the latest version, and is the one to cite unless a
+# particular release is meant.
+cff-version: 1.2.0
+title: "energese: Odum's Energy Systems Language as a LuaLaTeX package"
+message: "If you use this software, please cite it using the metadata in this file."
+type: software
+authors:
+  - given-names: Sholto
+    family-names: Maud
+    email: sholto.maud@gmail.com
+    # orcid: "https://orcid.org/0000-0000-0000-0000"
+repository-code: "https://github.com/energese-project/latex-energese"
+license: MIT
+version: v0.0.1
+date-released: "2026-09-05"
+doi: 10.5281/zenodo.22340275
+identifiers:
+  - type: doi
+    value: 10.5281/zenodo.22340275
+    description: "Concept DOI, resolving to the latest version"
+  - type: doi
+    value: 10.5281/zenodo.22340276
+    description: "DOI for version v0.0.1"
+abstract: >-
+  energese renders H. T. Odum's Energy Systems Language (ESL) diagrams from a
+  declarative model, in JSON or in TeX, as a LuaLaTeX package. Symbol geometry
+  is measured from Odum's published symbol sheet and checked against it on every
+  build; layout is derived from the model, placing components by transformity
+  and routing pathways around the symbols they do not connect to. A diagram is
+  therefore a function of its model rather than a drawing maintained beside it,
+  which is what lets a published figure be regenerated when the model changes.
+keywords:
+  - Energy Systems Language
+  - systems ecology
+  - H.T. Odum
+  - emergy
+  - transformity
+  - LaTeX
+  - LuaLaTeX
+  - TikZ
+  - scientific figures
+  - reproducible research
+  - diagram generation

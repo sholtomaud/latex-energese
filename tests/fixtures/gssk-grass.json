@@ -1,0 +1,21 @@
+{
+  "config": { "dt": 0.1, "t_start": 0, "t_end": 100, "method": "euler" },
+  "nodes": [
+    { "id": "sun", "type": "source", "value": 0,
+      "visual": { "x": 100, "y": 150, "label": "Sun" }, "currentValue": 0 },
+    { "id": "grass", "type": "storage", "value": 10,
+      "visual": { "x": 440, "y": 340, "label": "Grass Biomass", "capacity": 100 }, "currentValue": 10 },
+    { "id": "heat_sink", "type": "sink", "value": 0,
+      "visual": { "x": 480, "y": 600, "label": "Heat Sink" }, "currentValue": 0 }
+  ],
+  "edges": [
+    { "id": "production", "origin": "sun", "target": "grass", "logic": "linear",
+      "params": { "k": 0.1 }, "visual": { "points": [], "max_flow": 5 } },
+    { "id": "respiration", "origin": "grass", "target": "heat_sink", "logic": "linear",
+      "params": { "k": 0.05 },
+      "visual": { "points": [], "max_flow": 2,
+                  "ctrl1": { "x": 152.57, "y": 150.59 },
+                  "ctrl2": { "x": 90.15, "y": -67.67 } } }
+  ],
+  "boundaries": []
+}

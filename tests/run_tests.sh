@@ -7,6 +7,10 @@
 PHASE=${1:-all}
 FAILED=0
 
+# Overridable so the suite can run against a containerised or otherwise
+# non-PATH engine; the Makefile passes its own LUALATEX through.
+LUALATEX=${LUALATEX:-lualatex}
+
 run_test_suite() {
     local suite=$1
     echo "=========================================="
@@ -15,7 +19,7 @@ run_test_suite() {
 
     local dir=$(dirname "$suite")
     local base=$(basename "$suite")
-    if lualatex --interaction=nonstopmode --output-directory="$dir" "$suite.tex" > /dev/null 2>&1; then
+    if "$LUALATEX" --interaction=nonstopmode --output-directory="$dir" "$suite.tex" > /dev/null 2>&1; then
         echo "✓ PASS: $suite"
         # Generate PNG for visual verification
         if [ -f "${suite}.pdf" ]; then
@@ -49,28 +53,46 @@ if [ "$PHASE" == "all" ] || [ "$PHASE" == "4" ]; then
     run_test_suite "tests/unit/test_shapes"
 fi
 
+# Asserting, not just compiling: test_ports raises a TeX error when a port rule
+# is broken, so a failure here is a failure of the rule and not of the build.
 if [ "$PHASE" == "all" ] || [ "$PHASE" == "5" ]; then
-    run_test_suite "tests/integration/test_edge_routing"
+    run_test_suite "tests/unit/test_ports"
 fi
 
+# Lua-level assertions about the layout engine: the path a router returns, the
+# lanes the dissipation bundle nests in, where a modifier attaches, what the
+# system window encloses. A picture cannot fail these; the numbers can.
 if [ "$PHASE" == "all" ] || [ "$PHASE" == "6" ]; then
-    run_test_suite "tests/integration/test_heat_sinks"
+    run_test_suite "tests/unit/test_routing"
 fi
 
+# Reading a GSSK model: the normalisation that lets one file simulate and draw.
 if [ "$PHASE" == "all" ] || [ "$PHASE" == "7" ]; then
-    run_test_suite "tests/integration/test_complete_rendering"
+    run_test_suite "tests/unit/test_gssk"
 fi
 
 if [ "$PHASE" == "all" ] || [ "$PHASE" == "8" ]; then
-    run_test_suite "tests/integration/test_inline_json"
+    run_test_suite "tests/integration/test_edge_routing"
 fi
 
 if [ "$PHASE" == "all" ] || [ "$PHASE" == "9" ]; then
+    run_test_suite "tests/integration/test_heat_sinks"
+fi
+
+if [ "$PHASE" == "all" ] || [ "$PHASE" == "10" ]; then
+    run_test_suite "tests/integration/test_complete_rendering"
+fi
+
+if [ "$PHASE" == "all" ] || [ "$PHASE" == "11" ]; then
+    run_test_suite "tests/integration/test_inline_json"
+fi
+
+if [ "$PHASE" == "all" ] || [ "$PHASE" == "12" ]; then
     suite="tests/integration/test_error_messages"
     echo "=========================================="
     echo "Running: $suite (expecting errors)"
     echo "=========================================="
-    lualatex --interaction=nonstopmode --output-directory="tests/integration" "$suite.tex" > /dev/null 2>&1
+    "$LUALATEX" --interaction=nonstopmode --output-directory="tests/integration" "$suite.tex" > /dev/null 2>&1
 
     # Check for expected error patterns in log
     MISSING_ERRORS=0

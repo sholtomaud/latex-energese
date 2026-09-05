@@ -16,9 +16,24 @@ jobs:
     - name: Install LaTeX dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y texlive-luatex texlive-latex-base texlive-latex-extra
+        sudo apt-get install -y texlive-luatex texlive-latex-base \
+          texlive-latex-extra texlive-latex-recommended texlive-fonts-extra \
+          poppler-utils python3-pil
 
-    - name: Run tests
-      run: |
-        chmod +x tests/run_tests.sh
-        ./tests/run_tests.sh all
+    # `make check` runs the test suite, builds every example, asserts the JSON
+    # and TeX front ends still rasterise identically, runs the fidelity harness
+    # (golden-image regression plus conformance against Odum's measured
+    # geometry), and builds the user guide.
+    - name: Run checks
+      run: make check
+
+    - name: Upload rendered output
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: rendered-diagrams
+        path: |
+          examples/*.pdf
+          docs/*.pdf
+          tests/fidelity/diff/
+        if-no-files-found: ignore

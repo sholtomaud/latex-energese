@@ -1,0 +1,33 @@
+{
+  "upload_type": "software",
+  "title": "energese: Odum's Energy Systems Language as a LuaLaTeX package",
+  "description": "<p>energese renders H. T. Odum's Energy Systems Language (ESL) diagrams from a declarative model, in JSON or in TeX, as a LuaLaTeX package.</p><p>Symbol geometry is measured from Odum's published symbol sheet and checked against it on every build; layout is derived from the model, placing components by transformity and routing pathways around the symbols they do not connect to. A diagram is therefore a function of its model rather than a drawing maintained beside it, which is what lets a published figure be regenerated when the model changes.</p><p>Correctness is asserted at three levels: golden-image regression against approved renders, geometric conformance against measurements taken from Odum's own sheet, and a parity check requiring the JSON and TeX front ends to rasterise identically.</p>",
+  "creators": [
+    {
+      "name": "Maud, Sholto"
+    }
+  ],
+  "license": "mit",
+  "access_right": "open",
+  "keywords": [
+    "Energy Systems Language",
+    "systems ecology",
+    "H.T. Odum",
+    "emergy",
+    "transformity",
+    "LaTeX",
+    "LuaLaTeX",
+    "TikZ",
+    "scientific figures",
+    "reproducible research",
+    "diagram generation"
+  ],
+  "related_identifiers": [
+    {
+      "identifier": "https://github.com/energese-project/latex-energese",
+      "relation": "isSupplementTo",
+      "resource_type": "software",
+      "scheme": "url"
+    }
+  ]
+}

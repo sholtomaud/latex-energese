@@ -1,0 +1,94 @@
+%% article.tex -- draft for submission to Ecological Modelling.
+%%
+%% STATUS: section plan with worked figures. Prose marked [OUTLINE] is a plan of
+%% what the section must argue, not finished text.
+%%
+%% Submission format: Elsevier wants elsarticle.cls. That class is not in the
+%% build container, so this drafts in `article` and switches at submission:
+%%   \documentclass[preprint,12pt]{elsarticle}
+%% with \begin{frontmatter}...\end{frontmatter} replacing \maketitle.
+%%
+%% Figures come from the fidelity harness, not from hand-drawn illustrations:
+%%   make compare sheet     # regenerates every figure this file includes
+%% That is deliberate. The figures showing that the symbols match Odum's
+%% originals are produced by the same code that tests it.
+
+\documentclass[11pt,a4paper]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{graphicx}
+\usepackage{subcaption}
+\usepackage{booktabs}
+\usepackage{listings}
+\usepackage{natbib}
+\usepackage{energese}
+\usepackage{hyperref}
+
+% Both spellings, so the paper builds whether lualatex runs from the repository
+% root (as the Makefile does) or from docs/ (as an editor's build button does).
+\graphicspath{{tests/fidelity/out/}{reference-images/}%
+              {../tests/fidelity/out/}{../reference-images/}}
+
+\lstset{basicstyle=\ttfamily\footnotesize, columns=fullflexible,
+        breaklines=true, frame=single, framesep=4pt, xleftmargin=6pt}
+
+\title{Energese: reproducible typesetting of Odum Energy Systems Language
+       diagrams in \LaTeX}
+\author{S. Maud}
+\date{Draft}
+
+\begin{document}
+\maketitle
+
+\section{Introduction}
+
+I'm writing some notes on the Odum Energy Systems Language (ESL) and the \texttt{energese} package. Claude LLM is working on the ./article.text as a draft of a paper for submission to \emph{Ecological Modelling}. These notes are intended to be a reference for the article while CLause is working on it. They are not intended to be published, but they may be useful to chat with LLMs. 
+
+\section{NOTES:}
+
+I think the article should look at the history of the ESL, going back into some of the original papers by Odum and others. It should also look at the history of the \texttt{energese} package, and what motivates its development. The article should also look at the current state of the ESL, and what the future might hold for it and the barrier to entry. Looking at OpenSource issues, and how the dvelopment of the packge surfaced some of the issues with the ESL in relation to glyphs nodes and edges and graph diagrams, but also the issues with the ESL in relation to the underlying theory of systems ecology regarding the syntax and semantics of the ESL. 
+
+For example, the ESL is a graphical language, but it is not a formal language. It is not a programming language, and it does not have a formal grammar or semantics. This makes it difficult to reason about the ESL in a formal way, and it makes it difficult to implement tools that can manipulate ESL diagrams in a reliable way using opensource tools, indeed many tools have been created like MSVisio, CorelDraw, Adobe Illustrator etc which have tried to support these types of glyphs. However the proprietary nature of many of these tools limits their accessibility and reproducibility and costs. Latex, although baroke, is an open standard which many academic publishers support. More recently Draw.io became a web-based tool that was open soruce for diagramming , that supports the creation and manipulation of diagrams. Charles A. Hall requested a template be created for his phd studies and so the Author created such in this GitHub repo. Findings from that exercise, in part,  motivated the latex package development. In particular the distrubution of the template was limited to only Charles A. Hall's students. Nevertheless the tempalte is still available online with documentation on how to use it given in the README.md file. However, in building that template an open question was raised about how to validate diagrams. One of the complaints by Odum was that scholars could develop mathematical models of systems which were energetiically invalid. Although the Energese was invented to enable and support scholars in developing valid energetic models for systesm, and was grounded in electric circuit schematics for this purpose, any drawing tools like those mentioned above, do not have any way to energetically validate the diagrams. The Energese package was developed, in part, to address this issue, and to provide a way to validate diagrams. The process in which this validation is done is not yet formalized, but it is a work in progress, and the package is being developed to support this. Presently the package can support two different constructions methods for diagrams. One is inline latex, the other is importing a json definition of a diagram. The latter is more flexible and allows for the creation of diagrams in a more programmatic way, but it is also more complex and requires more knowledge of the underlying data structures, or a editor and simulator that are built against a schema that can be used for validation. The former is simpler and more accessible, but it is also more limited in validation capabilities. A scholar can still create energetically invalid diagrams using the inline method, but the package can provide some feedback on the validity of the diagram. The json import method would be the preferred method for creating diagrams validated using other tools like the GSSK which is a systems dynamics tool that can be used to validate diagrams, and simulate valid models using ODE.
+
+The task of validation is further complicated by the introduction of the \textit{enmergy}, \textit{emergy}, \textit{embodied energy} or \textit{energy memory} concept, since the algorithms used to calculate these quantities are not standardized, and there is no formal definition of how to calculate them, or, therefore, how to validate them. This makes it difficult to validate diagrams that use these concepts, since different scholars may use different algorithms to calculate them. The decision here is that the package will not attempt to energetically validate model definitions, and so will only provide a way to represent the pre-emergy version of Sysetms Ecology models in diagrams. \cite{Valyai,Valyai}, for example attempted to compute a formal definition of emergy, but this was not widely accepted by the community, nevertheless the `emergy simulator' had a concept of dual flows of energy and emergy depicted on a diagram. That depiction, is not presently supported in the Energese \LaTeX package.  The package will provide a way to represent the pre-emergy version of Systems Ecology models in diagrams, and will provide a way to validate the diagrams in terms of their energetic validity, but will not attempt to validate the emergy calculations. 
+
+Furthermore, in addressing the issue of model validation, it was found that there is an implied `syntax' for the ESL model diagrams. One of the components of the syntax was the concept of \textit{energy quality}, or \textit{energy trainsformation ratio} or \textit{transformity}. Although the implied syntax of the ESL model diagrams is not formally defined, which makes it difficult to validate the visual features of diagrams, it is evident that the syntax specifies that low energy quality (low transformity) glyphs (nodes) of a graph should be `placed' or `forced' to the left of a diagram on the horizontal axis, while high energy quality (high transformity) glyphs placed to the right hand side on the picture horizontal axis. This then raised the question, as to the scaling of the placement of nodes in a schematic-like way where there is not quite a linear or log-normal transformity syntax placement scale on the x-axis but there is something here which dictates the placement. This also raised the question around a formally analogous scaling system for the verticle or y-axis of the diagram. This remains an open question, and is addressed in the Energese package through the following glyph and edge (flow arrow) placement rules. We know, that the heat sink (low quality energy) is palce at the middle-bottom of the diagram. So this seems to transgress the implied horizontal syntax of the esl and it also brings into focus the vertical syntax and placement of nodes/glyphs. 
+
+NOTE!!!!! We need to flesh these out against the ACTUAL IMPLEMENTATION OF THE ENERGESE PACKAGE, and the actual placement of nodes and edges in the diagrams. The following is a summary of the placement rules for nodes and edges in the Energese package
+\begin{itemize}
+
+    \item The horizontal axis of the diagram is used to represent the energy quality of the nodes
+    \item Pathway-crossing minimisation — the third of your three priorities. The router avoids symbols and displaced labels but doesn't yet reason about other pathways, which is what you can see in the money arcs.
+    \item Transaction diamond / money-energy coupling — still needs the model construct
+    \item The vertical axis of the diagram is used to represent the energy quantity of the nodes
+    \item The placement of nodes on the horizontal axis is determined by their energy quality, with low energy quality nodes placed to the left and high energy quality nodes placed to the right
+    \item The placement of nodes on the vertical axis is determined by their energy quantity, with low energy quantity nodes placed at the bottom and high energy quantity nodes placed at the top
+    \item The placement of edges (flow arrows) is determined by the placement of the nodes they connect, with edges flowing from low energy quality nodes to high energy quality nodes, and from low energy quantity nodes to high energy quantity nodes
+\end{itemize}
+
+
+
+
+
+the maintenance and distribution of standard symbol set and importing that set has been difficult to maintain.  
+
+The article should also look at the current state of the \texttt{energese} package, and what the future might hold for it.
+
+\begin{thebibliography}{9}
+\bibitem[Odum(1994)]{odum1994}
+Odum, H.T., 1994. \emph{Ecological and General Systems: An Introduction to
+Systems Ecology}. University Press of Colorado.
+
+\bibitem[Odum(1996)]{odum1996}
+Odum, H.T., 1996. \emph{Environmental Accounting: Emergy and Environmental
+Decision Making}. Wiley.
+
+\bibitem[Brown and Ulgiati(2004)]{brown2004}
+Brown, M.T., Ulgiati, S., 2004. Energy quality, emergy, and transformity.
+\emph{Science of the Total Environment} 326(1--3), 1--10.
+
+% [OUTLINE] Still to add: Tantau (TikZ/PGF manual); a reproducible-research
+% citation for the figure-provenance argument; systems-dynamics tool citations
+% for section 2; a citation for the ESL symbol set as formally defined.
+\end{thebibliography}
+
+\end{document}
