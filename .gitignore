@@ -1,10 +1,31 @@
+# LaTeX build artifacts
 *.aux
 *.log
+*.out
+*.toc
+*.fls
+*.fdb_latexmk
+*.synctex.gz
 *.pdf
+
+# Rendered diagrams. Regenerate with `make examples` / `make test`.
 output/
+examples/*.png
+tests/unit/*.png
+tests/integration/*.png
+tests/visual-regression/results/
+
+# reference-images/ holds scans of Odum's originals: source material, not output.
 !reference-images/*.png
-!examples/*.json
-!examples/*.tex
-!tests/unit/*.tex
-!tests/integration/*.tex
-!scripts/*.py
+
+# Quarantine for superseded files. Not deleted, not shipped.
+temp/
+
+# macOS
+.DS_Store
+tests/fidelity/out/
+tests/fidelity/diff/
+
+# Python
+__pycache__/
+*.pyc

@@ -1,0 +1,127 @@
+{
+  "reference": "reference-images/complete-odum-symbols.png",
+  "method": "Each symbol's interior was isolated by flood-filling from a seed point inside its closed outline, which excludes the attached inflow, outflow and heat-sink arrows. The aspect ratio is the width over the height of that interior region. Measured by tests/fidelity/measure_reference.py; rerun it rather than editing these numbers by hand.",
+  "precision": "The reference is a 144 DPI capture in which symbol interiors span 31-107 px. A one-pixel error on the smaller dimension is therefore worth 1-3%. Tolerances below are set no tighter than that measurement precision justifies, and a symbol whose tolerance is wider says why.",
+  "symbols": {
+    "source": {
+      "aspect": 0.984,
+      "aspect_tol": 0.03,
+      "measured_px": [
+        62,
+        63
+      ],
+      "note": "circle; measures round, which validates the extraction",
+      "iou_measured": 0.982,
+      "iou_min": 0.93,
+      "height_ratio": 1.016,
+      "height_ratio_tol": 0.05
+    },
+    "storage": {
+      "aspect": 0.968,
+      "aspect_tol": 0.05,
+      "measured_px": [
+        60,
+        62
+      ],
+      "note": "tank; peak height is sensitive to stroke width at this DPI",
+      "iou_measured": 0.899,
+      "iou_min": 0.85,
+      "height_ratio": 1.0,
+      "height_ratio_tol": 0.05
+    },
+    "producer": {
+      "aspect": 1.726,
+      "aspect_tol": 0.06,
+      "measured_px": [
+        107,
+        62
+      ],
+      "note": "rectangle plus semicircular right cap",
+      "iou_measured": 0.99,
+      "iou_min": 0.94,
+      "height_ratio": 1.0,
+      "height_ratio_tol": 0.05
+    },
+    "consumer": {
+      "aspect": 0.877,
+      "aspect_tol": 0.04,
+      "measured_px": [
+        71,
+        81
+      ],
+      "note": "hexagon pointed top and bottom; shoulders at 0.46 of half-height",
+      "iou_measured": 0.966,
+      "iou_min": 0.92,
+      "height_ratio": 1.306,
+      "height_ratio_tol": 0.05
+    },
+    "transaction": {
+      "aspect": 2.226,
+      "aspect_tol": 0.1,
+      "measured_px": [
+        69,
+        31
+      ],
+      "note": "exchange diamond; at 31 px tall the reference's own 2-3 px stroke consumes much of the interior, which caps the achievable overlap -- hence the lowest threshold here",
+      "iou_measured": 0.677,
+      "iou_min": 0.63,
+      "height_ratio": 0.5,
+      "height_ratio_tol": 0.05
+    },
+    "interaction": {
+      "aspect": 1.886,
+      "aspect_tol": 0.1,
+      "measured_px": [
+        66,
+        35
+      ],
+      "note": "pointed right, notched left; 35 px of height limits precision",
+      "iou_measured": 0.937,
+      "iou_min": 0.89,
+      "height_ratio": 0.565,
+      "height_ratio_tol": 0.05
+    },
+    "gain": {
+      "aspect": 0.917,
+      "aspect_tol": 0.09,
+      "measured_px": [
+        33,
+        36
+      ],
+      "note": "constant-gain amplifier; 33 px wide makes this the least precise",
+      "iou_measured": 0.922,
+      "iou_min": 0.87,
+      "height_ratio": 0.581,
+      "height_ratio_tol": 0.05
+    },
+    "loop_limited": {
+      "aspect": 1.019,
+      "aspect_tol": 0.06,
+      "measured_px": [
+        54,
+        53
+      ],
+      "note": "body taller than wide; the style's minimum width/height ratio sets this",
+      "iou_measured": 0.96,
+      "iou_min": 0.91,
+      "height_ratio": 0.855,
+      "height_ratio_tol": 0.05
+    },
+    "switch": {
+      "aspect": 1.036,
+      "aspect_tol": 0.06,
+      "measured_px": [
+        58,
+        56
+      ],
+      "note": "switching action; all four sides bowed inward",
+      "iou_measured": 0.919,
+      "iou_min": 0.87,
+      "height_ratio": 0.903,
+      "height_ratio_tol": 0.05
+    }
+  },
+  "iou_method": "Interior-region overlap: each symbol's enclosed region is isolated (by flood fill for the reference, by filling the outline for the render), normalised to a 512x512 square, and compared by intersection over union. Interiors rather than outlines, so the measure is independent of stroke weight -- which differs between a 144 dpi capture and a vector render and is not what conformance asks about.",
+  "iou_calibration": "iou_min is the measured agreement less 0.05, so a threshold reflects what this symbol pair actually achieves rather than a guess. Re-run measure_reference.py and re-derive rather than loosening a threshold to make a failure go away.",
+  "height_ratio_method": "Height of the bare symbol divided by the bare producer's, against the same ratio measured from Odum's sheet. This is what the grid exists to guarantee: each shape grows from its label at its own rate (producer 2.0x the text half-height, consumer 3.23x, gain 5.2x), so without a common floor identical labels give wildly different symbols. \\energeseunit sets that floor per symbol; this invariant checks it still holds."
+}

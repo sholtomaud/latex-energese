@@ -1,57 +1,905 @@
+%% energese-shapes.tex -- Odum Energy Systems Language symbols as PGF shapes.
+%%
+%% Every shape sizes itself to its label. \energese@measure derives a text
+%% half-width and half-height from \pgfnodeparttextbox plus the inner
+%% separation, clamped against `minimum width' and `minimum height'; each shape
+%% then grows its outline around that rectangle by a shape-specific margin, so
+%% the label always sits inside the symbol. Fixed-size symbols clip anything
+%% longer than a word.
+%%
+%% Geometry follows Odum's canonical symbol set:
+%%   source       circle
+%%   storage      circle with a flattened, peaked top (a tank)
+%%   producer     rectangle closed by a semicircle on the right
+%%   consumer     hexagon, pointed top and bottom, with vertical sides
+%%   transaction  diamond (Odum's "exchange")
+%%   interaction  pointed right, notched left
+%%   gain         right-pointing triangle (constant-gain amplifier)
+%%   loop_limited rectangle whose right side bows outward
+%%   switch       square with all four sides bowed inward
+%%   ground       fixed-size ground glyph; carries no label
+%%
+%% Anchor conventions used by the layout engine: energy enters at `energy_in'
+%% on the left and leaves at `energy_out' on the right; money moves through
+%% `money_in'/`money_out' in the upper half; dissipation leaves through
+%% `heat_sink' at the bottom.
+%%
+%% Proportions are measured from reference-images/complete-odum-symbols.png by
+%% flood-filling each symbol's interior, which excludes the attached arrows.
+%% tests/fidelity/invariants.json records the targets and tolerances, and
+%% `make conformance' checks the rendered symbols against them. Do not adjust
+%% these numbers by eye.
+
+% Own scratch registers rather than \pgf@xa and friends, so that an
+% intervening \pgfmathsetlength cannot disturb a partial measurement.
+\newdimen\energese@dimx
+\newdimen\energese@dimy
+\newdimen\energese@tmp
+
+% Measure the node's text box. Leaves the half-width in \energese@dimx and the
+% half-height in \energese@dimy, each at least half the requested minimum size.
+\def\energese@measure{%
+    \energese@dimx=.5\wd\pgfnodeparttextbox%
+    \pgfmathsetlength\energese@tmp{\pgfkeysvalueof{/pgf/inner xsep}}%
+    \advance\energese@dimx by\energese@tmp%
+    \energese@dimy=.5\ht\pgfnodeparttextbox%
+    \advance\energese@dimy by.5\dp\pgfnodeparttextbox%
+    \pgfmathsetlength\energese@tmp{\pgfkeysvalueof{/pgf/inner ysep}}%
+    \advance\energese@dimy by\energese@tmp%
+    \pgfmathsetlength\energese@tmp{\pgfkeysvalueof{/pgf/minimum width}}%
+    \energese@tmp=.5\energese@tmp%
+    \ifdim\energese@dimx<\energese@tmp%
+        \energese@dimx=\energese@tmp%
+    \fi%
+    \pgfmathsetlength\energese@tmp{\pgfkeysvalueof{/pgf/minimum height}}%
+    \energese@tmp=.5\energese@tmp%
+    \ifdim\energese@dimy<\energese@tmp%
+        \energese@dimy=\energese@tmp%
+    \fi%
+}
+
+% Fit an outline to a label without distorting it.
+%
+% A symbol must hold its shape at every size: widening a hexagon to swallow a
+% long label makes it read as a different symbol. So each shape declares its
+% canonical aspect R (outline width over height, measured from Odum's sheet)
+% and the fractions of that outline its text may occupy, fx and fy. The outline
+% is then the smallest size at aspect R which contains the label, and the label
+% -- not the shape -- is what gives way when it will not fit.
+%
+% \energesemagnitude scales the symbol only. Applying TikZ's `scale' to the node
+% would scale its label too, so two symbols of different magnitude carrying the
+% same words rendered them at different sizes.
+%
+% Leaves the outline half-width in \energese@outw and half-height in
+% \energese@outh.
+\newdimen\energese@outw
+\newdimen\energese@outh
+\def\energesemagnitude{1}
+
+\def\energese@fit#1#2#3{%
+    \energese@measure%
+    \pgfmathsetlength\energese@tmp{%
+        \energesemagnitude * max(\the\energese@dimx/(#2*#1), \the\energese@dimy/#3)}%
+    \energese@outh=\energese@tmp%
+    \pgfmathsetlength\energese@tmp{#1*\the\energese@outh}%
+    \energese@outw=\energese@tmp%
+}
+
+% Connection ring -- the symbol's ports.
+%
+% Every symbol carries a ring of connection points spaced a fixed distance
+% apart *along its outline* -- \energeseanchorpitch, 3mm by default. Spacing
+% rather than a count is the point: a coupled pair attaching at `ring 3' and
+% `ring 4' is separated by the same distance whichever symbol it meets, so
+% couplings read alike across a diagram. A large symbol therefore carries more
+% ports than a small one. (The pitch is nominal to within one port in
+% \energese@ringN below, which explains why.)
+%
+% These are the ports: a pathway attaches to one of them and to nothing else,
+% and a port holds one pathway (see \energeseport in energese.sty). The named
+% anchors (energy_in, money_out, ...) name a *direction* -- where a kind of
+% flow belongs, as Odum draws it -- and the port used is the ring point nearest
+% that direction, which for the anchors on the axes is the same point. A
+% connection point free to sit between ports would put a pathway somewhere the
+% symbol does not offer one.
+%
+% The anchors are named by index, `ring 0' at 0 degrees and counting
+% anticlockwise, because the angle of a given index depends on the symbol's
+% size. Indices run to 47; past the ring's last port they wrap, harmlessly
+% repeating earlier positions.
+%
+% The angular step comes from the pitch over the symbol's effective radius,
+% which is exact for a circle and an approximation elsewhere; each shape's
+% radius-at-angle macro then puts the point on its actual outline. Being *on
+% the outline* is the part that must be exact -- a port off the glyph is a
+% pathway attached to nothing -- and every radius macro below is exact, or
+% converged to better than 0.05%, for that reason.
+\newlength{\energeseanchorpitch}
+\setlength{\energeseanchorpitch}{3mm}
+
+% How many ports fit around this outline: the pitch sets the angular step, and
+% the count is that step's share of a full turn, rounded to a multiple of four.
+%
+% Rounding to four is what makes the ring usable as a port set. It puts a port
+% exactly on each axis, and the axes are where Odum's flows meet a symbol --
+% energy in at 180 degrees and out at 0, dissipation at 270, feedback at 90 --
+% so quantising those anchors onto the ring moves them nowhere. Rounding to a
+% whole number of pitches instead, as this did, left the leftover fraction of
+% a turn as one wide gap at the wrap, and put no port at all on three of the
+% four axes: an interaction's inflow then attached half a pitch up the notch
+% edge instead of at its apex.
+%
+% The price is that the pitch is nominal, not exact. The step is 360/count
+% rather than the pitch itself, so spacing runs up to 2/count away from 3mm --
+% at most a fifth on the smallest symbols, a few percent on the largest. That
+% is the better trade: a coupled pair still separates by the same distance at
+% every symbol to within that, whereas the old wrap gap was a whole step wrong
+% on every symbol, always in the same place.
+%
+% Four is the floor. A symbol with fewer ports than axes cannot take the flows
+% that Odum's convention requires of it.
+%
+% Forty-eight is the ceiling, because that is how many ring anchors each shape
+% declares below (and \energese@ringmax in energese.sty, which must agree).
+% Past about 23mm of effective radius the pitch asks for more, and those a
+% pathway could not name: the allocator, finding no anchor for the port it
+% wanted, would walk on until it found one and attach the pathway to the far
+% side of the symbol. A ring that closes coarsely is much the lesser evil, and
+% 48 is a multiple of four, so the ports stay on the axes. Raising the ceiling
+% means declaring more anchors in every shape.
+%
+% Divide before multiplying by the index. pgfmath saturates at about 16384, and
+% index * 57.29578 * pitch overflows that well before the division would have
+% brought it back into range.
+\def\energese@ringN#1{%
+    \pgfmathsetmacro{\es@reff}{#1}%
+    \pgfmathsetmacro{\es@step}{57.29578 * \the\energeseanchorpitch / \es@reff}%
+    \pgfmathtruncatemacro{\es@count}{max(4, min(48, 4*round(90 / \es@step)))}%
+}
+
+\def\energese@ringpt#1#2#3{%
+    \energese@ringN{#2}%
+    % Indices past the last port repeat earlier ones exactly, rather than
+    % precessing into the gaps between them.
+    %
+    % Parenthesised, and not `index * 360 / count': pgfmath evaluates left to
+    % right and saturates near 16384, so on a symbol carrying 46 ports or more
+    % the multiplication overflows before the division can bring it back, and
+    % the anchor dies with `Dimension too large'.
+    \pgfmathsetmacro{\es@th}{mod(#1, \es@count) * (360 / \es@count)}%
+    #3%
+    \pgfmathsetmacro{\es@px}{\es@rr*cos(\es@th)}%
+    \pgfmathsetmacro{\es@py}{\es@rr*sin(\es@th)}%
+    \pgfpoint{\es@px pt}{\es@py pt}%
+}
+
+% The port count, published as an anchor so that code outside the shape -- the
+% port allocator, the test harness -- can ask for it. PGF offers no other way
+% out of a shape declaration, so the count rides in a coordinate: it is the
+% offset from the node's centre, in points.
+%
+% Which is why `ringunit' exists beside it. An anchor's coordinate goes through
+% the picture's transformation like any other, so under `scale=0.85' a count of
+% 12 is read back as 10.2 -- and the allocator, quantising to a ring of ten
+% points that the shape had drawn as twelve, put the heat-sink port at 240
+% degrees instead of 270 and dissipation left the corner of the symbol. Reading
+% the count as the *ratio* of the two offsets cancels whatever transformation
+% was applied to both.
+\def\energese@ringcount#1{%
+    \energese@ringN{#1}%
+    \pgfpoint{\es@count pt}{0pt}%
+}
+
+\def\energese@ring#1#2{%
+    \anchor{ringcount}{\energese@ringcount{#1}}%
+    \anchor{ringunit}{\pgfpoint{1pt}{0pt}}%
+    \anchor{ring0}{\energese@ringpt{0}{#1}{#2}}%
+    \anchor{ring1}{\energese@ringpt{1}{#1}{#2}}%
+    \anchor{ring2}{\energese@ringpt{2}{#1}{#2}}%
+    \anchor{ring3}{\energese@ringpt{3}{#1}{#2}}%
+    \anchor{ring4}{\energese@ringpt{4}{#1}{#2}}%
+    \anchor{ring5}{\energese@ringpt{5}{#1}{#2}}%
+    \anchor{ring6}{\energese@ringpt{6}{#1}{#2}}%
+    \anchor{ring7}{\energese@ringpt{7}{#1}{#2}}%
+    \anchor{ring8}{\energese@ringpt{8}{#1}{#2}}%
+    \anchor{ring9}{\energese@ringpt{9}{#1}{#2}}%
+    \anchor{ring10}{\energese@ringpt{10}{#1}{#2}}%
+    \anchor{ring11}{\energese@ringpt{11}{#1}{#2}}%
+    \anchor{ring12}{\energese@ringpt{12}{#1}{#2}}%
+    \anchor{ring13}{\energese@ringpt{13}{#1}{#2}}%
+    \anchor{ring14}{\energese@ringpt{14}{#1}{#2}}%
+    \anchor{ring15}{\energese@ringpt{15}{#1}{#2}}%
+    \anchor{ring16}{\energese@ringpt{16}{#1}{#2}}%
+    \anchor{ring17}{\energese@ringpt{17}{#1}{#2}}%
+    \anchor{ring18}{\energese@ringpt{18}{#1}{#2}}%
+    \anchor{ring19}{\energese@ringpt{19}{#1}{#2}}%
+    \anchor{ring20}{\energese@ringpt{20}{#1}{#2}}%
+    \anchor{ring21}{\energese@ringpt{21}{#1}{#2}}%
+    \anchor{ring22}{\energese@ringpt{22}{#1}{#2}}%
+    \anchor{ring23}{\energese@ringpt{23}{#1}{#2}}%
+    \anchor{ring24}{\energese@ringpt{24}{#1}{#2}}%
+    \anchor{ring25}{\energese@ringpt{25}{#1}{#2}}%
+    \anchor{ring26}{\energese@ringpt{26}{#1}{#2}}%
+    \anchor{ring27}{\energese@ringpt{27}{#1}{#2}}%
+    \anchor{ring28}{\energese@ringpt{28}{#1}{#2}}%
+    \anchor{ring29}{\energese@ringpt{29}{#1}{#2}}%
+    \anchor{ring30}{\energese@ringpt{30}{#1}{#2}}%
+    \anchor{ring31}{\energese@ringpt{31}{#1}{#2}}%
+    \anchor{ring32}{\energese@ringpt{32}{#1}{#2}}%
+    \anchor{ring33}{\energese@ringpt{33}{#1}{#2}}%
+    \anchor{ring34}{\energese@ringpt{34}{#1}{#2}}%
+    \anchor{ring35}{\energese@ringpt{35}{#1}{#2}}%
+    \anchor{ring36}{\energese@ringpt{36}{#1}{#2}}%
+    \anchor{ring37}{\energese@ringpt{37}{#1}{#2}}%
+    \anchor{ring38}{\energese@ringpt{38}{#1}{#2}}%
+    \anchor{ring39}{\energese@ringpt{39}{#1}{#2}}%
+    \anchor{ring40}{\energese@ringpt{40}{#1}{#2}}%
+    \anchor{ring41}{\energese@ringpt{41}{#1}{#2}}%
+    \anchor{ring42}{\energese@ringpt{42}{#1}{#2}}%
+    \anchor{ring43}{\energese@ringpt{43}{#1}{#2}}%
+    \anchor{ring44}{\energese@ringpt{44}{#1}{#2}}%
+    \anchor{ring45}{\energese@ringpt{45}{#1}{#2}}%
+    \anchor{ring46}{\energese@ringpt{46}{#1}{#2}}%
+    \anchor{ring47}{\energese@ringpt{47}{#1}{#2}}%
+}
+
+%% Radius at angle \es@th, per shape. -----------------------------------------
+
+% Circle.
+\def\energese@src@rad{\pgfmathsetmacro{\es@rr}{\energese@src@r}}
+
+% Tank: a circle cut by the two straight edges of its peaked top. The arc
+% begins at 11.5 degrees, so those edges run through (0.97992R, 0.19937R).
+\def\energese@sto@rad{%
+    \pgfmathsetmacro{\es@R}{\energese@sto@r}%
+    \pgfmathsetmacro{\es@rr}{1/max(1/\es@R,
+        (0.80063*abs(cos(\es@th)) + 0.97992*sin(\es@th))/(0.97992*\es@R))}%
+}
+
+% Hexagon, shoulders at 0.46H: the intersection of six half-planes, which for a
+% convex outline is one over the largest of their normalised projections.
+\def\energese@con@rad{%
+    \pgfmathsetmacro{\es@W}{\energese@con@w}%
+    \pgfmathsetmacro{\es@H}{\energese@con@h}%
+    \pgfmathsetmacro{\es@rr}{1/max(abs(cos(\es@th))/\es@W,
+        (0.54*\es@H*abs(cos(\es@th)) + \es@W*abs(sin(\es@th)))/(\es@W*\es@H))}%
+}
+
+% Diamond.
+\def\energese@trn@rad{%
+    \pgfmathsetmacro{\es@W}{\energese@trn@w}%
+    \pgfmathsetmacro{\es@H}{\energese@trn@h}%
+    \pgfmathsetmacro{\es@rr}{1/(abs(cos(\es@th))/\es@W + abs(sin(\es@th))/\es@H)}%
+}
+
+% Triangle: flat left edge at -W, apex at +W.
+\def\energese@gan@rad{%
+    \pgfmathsetmacro{\es@W}{\energese@gan@w}%
+    \pgfmathsetmacro{\es@H}{\energese@gan@h}%
+    \pgfmathsetmacro{\es@rr}{1/max(-cos(\es@th)/\es@W,
+        (\es@H*cos(\es@th) + 2*\es@W*abs(sin(\es@th)))/(\es@W*\es@H))}%
+}
+
+% Rectangle closed by a semicircular cap of radius b centred on (a,0). Where the
+% ray leaves through the cap it reaches further than the body, so the larger of
+% the two is the outline.
+\def\energese@prd@rad{%
+    \pgfmathsetmacro{\es@a}{\energese@prd@a}%
+    \pgfmathsetmacro{\es@b}{\energese@prd@b}%
+    \pgfmathsetmacro{\es@disc}{\es@b*\es@b - (\es@a*sin(\es@th))^2}%
+    % Three cases, and the middle one is easy to miss: a ray steep enough to
+    % clear the cap entirely leaves through the flat right edge, not through a
+    % cap it never meets. Collapsing that case to the cap expression put the
+    % point inside the symbol.
+    \pgfmathsetmacro{\es@flat}{\es@a/max(0.05,abs(cos(\es@th)))}%
+    \pgfmathsetmacro{\es@side}{(cos(\es@th) > 0)
+        ? ((\es@disc > 0) ? (\es@a*cos(\es@th) + sqrt(max(0,\es@disc))) : \es@flat)
+        : \es@flat}%
+    \pgfmathsetmacro{\es@rr}{min(\es@side, \es@b/max(0.05,abs(sin(\es@th))))}%
+}
+
+% Same construction, but the right side bows out only 0.53b, which is the arc
+% through (a, +/-b) and (a + 0.53b, 0): centre (a - 0.678b), radius 1.208b.
+\def\energese@lop@rad{%
+    \pgfmathsetmacro{\es@a}{\energese@lop@a}%
+    \pgfmathsetmacro{\es@b}{\energese@lop@b}%
+    \pgfmathsetmacro{\es@cx}{\es@a - 0.678*\es@b}%
+    \pgfmathsetmacro{\es@rho}{1.208*\es@b}%
+    \pgfmathsetmacro{\es@disc}{\es@rho*\es@rho - (\es@cx*sin(\es@th))^2}%
+    \pgfmathsetmacro{\es@flat}{\es@a/max(0.05,abs(cos(\es@th)))}%
+    \pgfmathsetmacro{\es@side}{(cos(\es@th) > 0)
+        ? ((\es@disc > 0) ? (\es@cx*cos(\es@th) + sqrt(max(0,\es@disc))) : \es@flat)
+        : \es@flat}%
+    \pgfmathsetmacro{\es@rr}{min(\es@side, \es@b/max(0.05,abs(sin(\es@th))))}%
+}
+
+% Exact, despite the notch. The outline is non-convex, so the half-plane
+% construction is not obviously the right one -- but the notch replaces the
+% left edge rather than cutting into a region that has one, and its supporting
+% line passes through both left corners. Every ray therefore leaves through
+% whichever of the three constraints binds first, which is what 1/max(...)
+% computes. Checked against the sampled polygon at 0.1 degree steps and four
+% aspect ratios: agreement to 0.000%.
+\def\energese@int@rad{%
+    \pgfmathsetmacro{\es@W}{\energese@int@w}%
+    \pgfmathsetmacro{\es@H}{\energese@int@h}%
+    \pgfmathsetmacro{\es@n}{0.55*\es@H}%
+    \pgfmathsetmacro{\es@t}{0.85*\es@H}%
+    \pgfmathsetmacro{\es@rr}{1/max(abs(sin(\es@th))/\es@H,
+        (\es@H*cos(\es@th) + \es@t*abs(sin(\es@th)))/(\es@W*\es@H),
+        (-\es@H*cos(\es@th) - \es@n*abs(sin(\es@th)))/(\es@H*(\es@W-\es@n)))}%
+}
+
+% The bowed side, solved rather than approximated.
+%
+% In the box-normalised frame X = x/W, Y = y/H all four sides are one curve:
+% writing the top cubic in the symmetric parameter u = 2t-1 collapses it to
+%
+%     X(u) = 1.0875u - 0.0875u^3,   Y(u) = 0.715 + 0.285u^2,   u in [-1,1]
+%
+% -- the 0.715 at the axis and the corner at u = 1 both fall out of it -- and
+% the other three sides are its reflections. A ray whose normalised direction
+% has gradient m = min(|X'|,|Y'|)/max(|X'|,|Y'|) meets the side where
+%
+%     1.0875u - 0.0875u^3 = m (0.715 + 0.285u^2).
+%
+% Newton from u = m solves that to 2% in one step, 0.04% in two and to the
+% resolution of a sampled path in three. Three is what runs here.
+%
+% What this replaces: box radius * (0.715 + 0.285 sin^4 2t), which was up to
+% 19.6% outside the drawn outline between the axis and the corner -- the ring
+% points there sat visibly off the symbol, which for a port means a pathway
+% attached to nothing. A fixed-point iteration on the same equation converges
+% far too slowly near the corner to be worth the same three lines.
+\def\energese@swi@rad{%
+    \pgfmathsetmacro{\es@W}{\energese@swi@w}%
+    \pgfmathsetmacro{\es@H}{\energese@swi@h}%
+    \pgfmathsetmacro{\es@nx}{abs(cos(\es@th))/\es@W}%
+    \pgfmathsetmacro{\es@ny}{abs(sin(\es@th))/\es@H}%
+    \pgfmathsetmacro{\es@m}{min(\es@nx,\es@ny)/max(\es@nx,\es@ny)}%
+    \pgfmathsetmacro{\es@u}{\es@m}%
+    \energese@swi@newton\energese@swi@newton\energese@swi@newton
+    \pgfmathsetmacro{\es@ua}{0.715 + 0.285*\es@u*\es@u}%
+    \pgfmathsetmacro{\es@ub}{1.0875*\es@u - 0.0875*\es@u*\es@u*\es@u}%
+    % Which side the ray leaves through: past the diagonal of the normalised
+    % box it is the top, before it the right, and the two are the same curve
+    % with its coordinates swapped.
+    \pgfmathsetmacro{\es@rr}{(\es@ny > \es@nx)
+        ? veclen(\es@W*\es@ub, \es@H*\es@ua)
+        : veclen(\es@W*\es@ua, \es@H*\es@ub)}%
+}
+\def\energese@swi@newton{%
+    \pgfmathsetmacro{\es@u}{\es@u -
+        (1.0875*\es@u - 0.0875*\es@u*\es@u*\es@u
+         - \es@m*(0.715 + 0.285*\es@u*\es@u))
+        / (1.0875 - 0.2625*\es@u*\es@u - 0.57*\es@m*\es@u)}%
+}
+
+% The standard `text' anchor: shifts the label so its centre lands on the
+% node's origin, which is where every outline below is centred.
+\def\energese@textanchor{%
+    \pgf@x=-.5\wd\pgfnodeparttextbox%
+    \pgf@y=-.5\ht\pgfnodeparttextbox%
+    \advance\pgf@y by.5\dp\pgfnodeparttextbox%
+}
+
+%% -------------------------------------------------------------------------
+%% Source -- a circle. Energy leaves to the right.
+%% -------------------------------------------------------------------------
+% The circle must circumscribe the text rectangle, so the radius is that
+% rectangle's half-diagonal.
 \pgfdeclareshape{energese source}{
-    \savedanchor\centerpoint{\pgfpointorigin}
-    \saveddimen\energeseradius{\pgf@x=0.4cm}
-    \anchor{center}{\centerpoint}
-    \anchor{north}{\pgfpoint{0pt}{\energeseradius}}
-    \anchor{south}{\pgfpoint{0pt}{-\energeseradius}}
-    \anchor{east}{\pgfpoint{\energeseradius}{0pt}}
-    \anchor{west}{\pgfpoint{-\energeseradius}{0pt}}
-    \anchor{energy_out}{\pgfpoint{\energeseradius}{0pt}}
-    \anchor{money_in}{\pgfpoint{\energeseradius}{0.1cm}}
-    \anchor{money_out}{\pgfpoint{\energeseradius}{0.1cm}}
-    \anchor{feedback_in}{\pgfpoint{0pt}{\energeseradius}}
-    \anchor{heat_sink}{\pgfpoint{0pt}{-\energeseradius}}
+    \saveddimen\energese@src@r{%
+        \energese@measure%
+        \pgfmathsetlength\energese@tmp{\energesemagnitude *
+            veclen(\the\energese@dimx,\the\energese@dimy)}%
+        \pgf@x=\energese@tmp%
+    }
+    \savedanchor\energese@src@ne{%
+        \energese@measure%
+        \pgfmathsetlength\energese@tmp{\energesemagnitude *
+            veclen(\the\energese@dimx,\the\energese@dimy)}%
+        \pgf@x=\energese@tmp%
+        \pgf@y=\energese@tmp%
+    }
+    \anchor{center}{\pgfpointorigin}
+    \anchor{text}{\energese@textanchor}
+    \anchor{north}{\pgfpoint{0pt}{\energese@src@r}}
+    \anchor{south}{\pgfpoint{0pt}{-\energese@src@r}}
+    \anchor{east}{\pgfpoint{\energese@src@r}{0pt}}
+    \anchor{west}{\pgfpoint{-\energese@src@r}{0pt}}
+    \anchor{energy_in}{\pgfpoint{-\energese@src@r}{0pt}}
+    \anchor{energy_out}{\pgfpoint{\energese@src@r}{0pt}}
+    % 22.5 degrees above the horizontal, clear of the energy pathway.
+    \anchor{money_in}{\pgfmathsetmacro{\es@r}{\energese@src@r}%
+        \pgfpoint{0.924*\es@r pt}{0.383*\es@r pt}}
+    \anchor{money_out}{\pgfmathsetmacro{\es@r}{\energese@src@r}%
+        \pgfpoint{0.924*\es@r pt}{0.383*\es@r pt}}
+    \anchor{feedback_in}{\pgfpoint{0pt}{\energese@src@r}}
+    \anchor{feedback_out}{\pgfpoint{0pt}{\energese@src@r}}
+    \anchor{heat_sink}{\pgfpoint{0pt}{-\energese@src@r}}
+    \energese@ring{\energese@src@r}{\energese@src@rad}
+    \anchorborder{%
+        \pgf@xa=\pgf@x\pgf@ya=\pgf@y%
+        \pgf@process{\energese@src@ne}%
+        \pgfpointborderellipse{\pgfqpoint{\pgf@xa}{\pgf@ya}}{\pgfqpoint{\pgf@x}{\pgf@y}}%
+    }
     \backgroundpath{
-        \pgfpathcircle{\centerpoint}{\energeseradius}
+        \pgfpathcircle{\pgfpointorigin}{\energese@src@r}
     }
 }
 
-\pgfdeclareshape{energese producer}{
-    \savedanchor\centerpoint{\pgfpointorigin}
-    \saveddimen\halfwidth{\pgf@x=0.7cm}
-    \saveddimen\halfheight{\pgf@x=0.4cm}
-    \anchor{center}{\centerpoint}
-    \anchor{north}{\pgfpoint{0pt}{\halfheight}}
-    \anchor{south}{\pgfpoint{0pt}{-\halfheight}}
-    \anchor{east}{\pgfpoint{\halfwidth}{0pt}}
-    \anchor{west}{\pgfpoint{-\halfwidth}{0pt}}
-    \anchor{energy_in}{\pgfpoint{-\halfwidth}{-0.05cm}}
-    \anchor{energy_out}{\pgfpoint{\halfwidth}{-0.05cm}}
-    \anchor{money_in}{\pgfpoint{\halfwidth}{0.1cm}}
-    \anchor{money_out}{\pgfpoint{-\halfwidth}{0.1cm}}
-    \anchor{feedback_in}{\pgfpoint{0.2cm}{\halfheight}}
-    \anchor{feedback_out}{\pgfpoint{-0.2cm}{\halfheight}}
-    \anchor{heat_sink}{\pgfpoint{0pt}{-\halfheight}}
+%% -------------------------------------------------------------------------
+%% Storage -- a tank: a circle whose top is flattened into a shallow peak.
+%% -------------------------------------------------------------------------
+% Two constraints on the radius, plus the minimum-size floor. The circular part
+% must enclose the text (its half-diagonal), and the flattened top -- which
+% slopes from the peak at (0,R) down towards (0.98R, 0.2R), a gradient of
+% 0.82 -- must clear the text's upper corners.
+\pgfdeclareshape{energese storage}{
+    \saveddimen\energese@sto@r{%
+        \energese@measure%
+        \pgfmathsetlength\energese@tmp{\energesemagnitude *
+            max(veclen(\the\energese@dimx,\the\energese@dimy),
+                \the\energese@dimy + 0.82*\the\energese@dimx)}%
+        \pgf@x=\energese@tmp%
+    }
+    \savedanchor\energese@sto@ne{%
+        \energese@measure%
+        \pgfmathsetlength\energese@tmp{\energesemagnitude *
+            max(veclen(\the\energese@dimx,\the\energese@dimy),
+                \the\energese@dimy + 0.82*\the\energese@dimx)}%
+        \pgf@x=\energese@tmp%
+        \pgf@y=\energese@tmp%
+    }
+    \anchor{center}{\pgfpointorigin}
+    \anchor{text}{\energese@textanchor}
+    \anchor{north}{\pgfpoint{0pt}{\energese@sto@r}}
+    \anchor{south}{\pgfpoint{0pt}{-\energese@sto@r}}
+    \anchor{east}{\pgfpoint{\energese@sto@r}{0pt}}
+    \anchor{west}{\pgfpoint{-\energese@sto@r}{0pt}}
+    \anchor{energy_in}{\pgfpoint{-\energese@sto@r}{0pt}}
+    \anchor{energy_out}{\pgfpoint{\energese@sto@r}{0pt}}
+    \anchor{money_in}{\pgfmathsetmacro{\es@r}{\energese@sto@r}%
+        \pgfpoint{0.94*\es@r pt}{0.34*\es@r pt}}
+    \anchor{money_out}{\pgfmathsetmacro{\es@r}{\energese@sto@r}%
+        \pgfpoint{-0.94*\es@r pt}{0.34*\es@r pt}}
+    \anchor{feedback_in}{\pgfmathsetmacro{\es@r}{\energese@sto@r}%
+        \pgfpoint{0.4*\es@r pt}{0.68*\es@r pt}}
+    \anchor{feedback_out}{\pgfmathsetmacro{\es@r}{\energese@sto@r}%
+        \pgfpoint{-0.4*\es@r pt}{0.68*\es@r pt}}
+    \anchor{heat_sink}{\pgfpoint{0pt}{-\energese@sto@r}}
+    \energese@ring{\energese@sto@r}{\energese@sto@rad}
+    \anchorborder{%
+        \pgf@xa=\pgf@x\pgf@ya=\pgf@y%
+        \pgf@process{\energese@sto@ne}%
+        \pgfpointborderellipse{\pgfqpoint{\pgf@xa}{\pgf@ya}}{\pgfqpoint{\pgf@x}{\pgf@y}}%
+    }
     \backgroundpath{
-        \pgfmathsetmacro{\hw}{\halfwidth}
-        \pgfmathsetmacro{\hh}{\halfheight}
-        \pgfmathsetmacro{\qw}{0.3*\hw}
-        \pgfpathmoveto{\pgfpoint{-\hw pt}{0pt}}
-        \pgfpathcurveto{\pgfpoint{-\hw pt}{\hh pt}}{\pgfpoint{-\qw pt}{\hh pt}}{\pgfpoint{0pt}{\hh pt}}
-        \pgfpathlineto{\pgfpoint{\qw pt}{\hh pt}}
-        \pgfpathlineto{\pgfpoint{\hw pt}{0pt}}
-        \pgfpathlineto{\pgfpoint{\qw pt}{-\hh pt}}
-        \pgfpathlineto{\pgfpoint{0pt}{-\hh pt}}
-        \pgfpathcurveto{\pgfpoint{-\qw pt}{-\hh pt}}{\pgfpoint{-\hw pt}{-\hh pt}}{\pgfpoint{-\hw pt}{0pt}}
+        \pgfmathsetmacro{\es@r}{\energese@sto@r}
+        \pgfmathsetmacro{\es@sx}{0.97992*\es@r}
+        \pgfmathsetmacro{\es@sy}{0.19937*\es@r}
+        \pgfpathmoveto{\pgfpoint{-\es@sx pt}{\es@sy pt}}
+        \pgfpathlineto{\pgfpoint{0pt}{\es@r pt}}
+        \pgfpathlineto{\pgfpoint{\es@sx pt}{\es@sy pt}}
+        \pgfpatharc{11.5}{-191.5}{\es@r pt}
         \pgfpathclose
     }
 }
 
+%% -------------------------------------------------------------------------
+%% Producer -- a rectangle closed by a semicircle on the right.
+%% -------------------------------------------------------------------------
+% The text rectangle is [-a,a] x [-b,b] and the cap is a half-circle of radius b
+% centred on (a,0), so the symbol spans -a to a+b horizontally. It is
+% deliberately not centred on the origin: Odum's producer is asymmetric, and the
+% label belongs in the rectangular body rather than straddling the cap.
+\pgfdeclareshape{energese producer}{
+    % The cap occupies half the height, so the body's half-width is the
+    % outline's less half the outline height.
+    \saveddimen\energese@prd@a{\energese@fit{1.726}{0.710}{1.0}%
+        \pgf@x=\energese@outw \advance\pgf@x by-.5\energese@outh}
+    \saveddimen\energese@prd@b{\energese@fit{1.726}{0.710}{1.0}\pgf@x=\energese@outh}
+    \savedanchor\energese@prd@ne{\energese@fit{1.726}{0.710}{1.0}%
+        \pgf@x=\energese@outw \pgf@y=\energese@outh}
+    \anchor{center}{\pgfpointorigin}
+    \anchor{text}{\energese@textanchor}
+    \anchor{north}{\pgfpoint{0pt}{\energese@prd@b}}
+    \anchor{south}{\pgfpoint{0pt}{-\energese@prd@b}}
+    \anchor{west}{\pgfpoint{-\energese@prd@a}{0pt}}
+    \anchor{east}{\pgfpoint{\energese@prd@a + \energese@prd@b}{0pt}}
+    \anchor{energy_in}{\pgfpoint{-\energese@prd@a}{0pt}}
+    \anchor{energy_out}{\pgfpoint{\energese@prd@a + \energese@prd@b}{0pt}}
+    % 45 degrees around the cap, so money leaves clear of the energy pathway.
+    \anchor{money_in}{\pgfmathsetmacro{\es@a}{\energese@prd@a}%
+        \pgfmathsetmacro{\es@b}{\energese@prd@b}%
+        \pgfpoint{\es@a pt + 0.707*\es@b pt}{0.707*\es@b pt}}
+    \anchor{money_out}{\pgfmathsetmacro{\es@b}{\energese@prd@b}%
+        \pgfpoint{-\energese@prd@a}{0.5*\es@b pt}}
+    \anchor{feedback_in}{\pgfmathsetmacro{\es@a}{\energese@prd@a}%
+        \pgfpoint{0.3*\es@a pt}{\energese@prd@b}}
+    \anchor{feedback_out}{\pgfmathsetmacro{\es@a}{\energese@prd@a}%
+        \pgfpoint{-0.3*\es@a pt}{\energese@prd@b}}
+    \anchor{heat_sink}{\pgfpoint{0pt}{-\energese@prd@b}}
+    \energese@ring{\energese@prd@b}{\energese@prd@rad}
+    \anchorborder{%
+        \pgf@xa=\pgf@x\pgf@ya=\pgf@y%
+        \pgf@process{\energese@prd@ne}%
+        \pgfpointborderellipse{\pgfqpoint{\pgf@xa}{\pgf@ya}}{\pgfqpoint{\pgf@x}{\pgf@y}}%
+    }
+    \backgroundpath{
+        \pgfmathsetmacro{\es@a}{\energese@prd@a}
+        \pgfmathsetmacro{\es@b}{\energese@prd@b}
+        \pgfpathmoveto{\pgfpoint{-\es@a pt}{\es@b pt}}
+        \pgfpathlineto{\pgfpoint{\es@a pt}{\es@b pt}}
+        \pgfpatharc{90}{-90}{\es@b pt}
+        \pgfpathlineto{\pgfpoint{-\es@a pt}{-\es@b pt}}
+        \pgfpathclose
+    }
+}
+
+%% -------------------------------------------------------------------------
+%% Consumer -- a hexagon, pointed top and bottom, with vertical sides.
+%% -------------------------------------------------------------------------
+% Measured from reference-images/complete-odum-symbols.png by flood-filling the
+% symbol interior: aspect 0.877, with the shoulders at 0.46 of the half-height,
+% and energy entering and leaving through the vertical sides.
+%
+% Let H = lambda*b. Requiring the label's corner at y = b to sit inside the
+% sloped edge gives W >= a*0.54*lambda/(lambda-1); requiring the unlabelled
+% symbol to hit Odum's 0.877 aspect gives W = 0.877*lambda*b. Solving the two
+% together at a = b yields lambda = 1.616, at which both coefficients coincide
+% at 1.417 -- so H = 1.616b and W = 1.417*max(a,b) fits every label exactly and
+% keeps the canonical proportion.
+%
+% Deriving lambda rather than picking it matters: an earlier conservative rule
+% (H = b/0.46) also fitted every label, but made the consumer 2.17 times the
+% height of a producer carrying the same text. Odum's own diagrams put that
+% ratio at 1.69, which is what 1.616 delivers.
+\pgfdeclareshape{energese consumer}{
+    \saveddimen\energese@con@w{\energese@fit{0.877}{1.0}{0.46}\pgf@x=\energese@outw}
+    % A wide label drives W up, which would flatten the hexagon well past
+    % anything Odum draws (his labelled consumers measure 1.09-1.12 against a
+    % bare 0.877). Grow H alongside W to hold the aspect at 1.08 or below --
+    % a single-line label at 1.15 leaves the hexagon looking stretched even
+    % though a two-line label at the same ratio does not.
+    \saveddimen\energese@con@h{\energese@fit{0.877}{1.0}{0.46}\pgf@x=\energese@outh}
+    \savedanchor\energese@con@ne{\energese@fit{0.877}{1.0}{0.46}%
+        \pgf@x=\energese@outw \pgf@y=\energese@outh}
+    \anchor{center}{\pgfpointorigin}
+    \anchor{text}{\energese@textanchor}
+    \anchor{north}{\pgfpoint{0pt}{\energese@con@h}}
+    \anchor{south}{\pgfpoint{0pt}{-\energese@con@h}}
+    \anchor{east}{\pgfpoint{\energese@con@w}{0pt}}
+    \anchor{west}{\pgfpoint{-\energese@con@w}{0pt}}
+    \anchor{energy_in}{\pgfpoint{-\energese@con@w}{0pt}}
+    \anchor{energy_out}{\pgfpoint{\energese@con@w}{0pt}}
+    % Money runs through the vertical sides, above the energy pathway.
+    \anchor{money_in}{\pgfmathsetmacro{\es@w}{\energese@con@w}%
+        \pgfmathsetmacro{\es@h}{\energese@con@h}%
+        \pgfpoint{\es@w pt}{0.3*\es@h pt}}
+    \anchor{money_out}{\pgfmathsetmacro{\es@w}{\energese@con@w}%
+        \pgfmathsetmacro{\es@h}{\energese@con@h}%
+        \pgfpoint{-\es@w pt}{0.3*\es@h pt}}
+    % Feedback arrives on the upper slopes, as in Odum's originals.
+    \anchor{feedback_in}{\pgfmathsetmacro{\es@w}{\energese@con@w}%
+        \pgfmathsetmacro{\es@h}{\energese@con@h}%
+        \pgfpoint{0.5*\es@w pt}{0.73*\es@h pt}}
+    \anchor{feedback_out}{\pgfmathsetmacro{\es@w}{\energese@con@w}%
+        \pgfmathsetmacro{\es@h}{\energese@con@h}%
+        \pgfpoint{-0.5*\es@w pt}{0.73*\es@h pt}}
+    \anchor{heat_sink}{\pgfpoint{0pt}{-\energese@con@h}}
+    \energese@ring{\energese@con@h}{\energese@con@rad}
+    \anchorborder{%
+        \pgf@xa=\pgf@x\pgf@ya=\pgf@y%
+        \pgf@process{\energese@con@ne}%
+        \pgfpointborderellipse{\pgfqpoint{\pgf@xa}{\pgf@ya}}{\pgfqpoint{\pgf@x}{\pgf@y}}%
+    }
+    \backgroundpath{
+        \pgfmathsetmacro{\es@w}{\energese@con@w}
+        \pgfmathsetmacro{\es@h}{\energese@con@h}
+        \pgfmathsetmacro{\es@sh}{0.46*\es@h}
+        \pgfpathmoveto{\pgfpoint{0pt}{\es@h pt}}
+        \pgfpathlineto{\pgfpoint{\es@w pt}{\es@sh pt}}
+        \pgfpathlineto{\pgfpoint{\es@w pt}{-\es@sh pt}}
+        \pgfpathlineto{\pgfpoint{0pt}{-\es@h pt}}
+        \pgfpathlineto{\pgfpoint{-\es@w pt}{-\es@sh pt}}
+        \pgfpathlineto{\pgfpoint{-\es@w pt}{\es@sh pt}}
+        \pgfpathclose
+    }
+}
+
+%% -------------------------------------------------------------------------
+%% Transaction -- Odum's exchange diamond.
+%% -------------------------------------------------------------------------
+% W = a + 2.3b and H = b + a/2 keep the text's corners just inside the edges
+% while giving an unlabelled diamond the aspect of 2.23 measured from Odum's
+% sheet. Energy runs through the lower half, money through the upper.
+\pgfdeclareshape{energese transaction}{
+    \saveddimen\energese@trn@w{\energese@fit{2.226}{0.5}{0.5}\pgf@x=\energese@outw}
+    \saveddimen\energese@trn@h{\energese@fit{2.226}{0.5}{0.5}\pgf@x=\energese@outh}
+    \savedanchor\energese@trn@ne{\energese@fit{2.226}{0.5}{0.5}%
+        \pgf@x=\energese@outw \pgf@y=\energese@outh}
+    \anchor{center}{\pgfpointorigin}
+    \anchor{text}{\energese@textanchor}
+    \anchor{north}{\pgfpoint{0pt}{\energese@trn@h}}
+    \anchor{south}{\pgfpoint{0pt}{-\energese@trn@h}}
+    \anchor{east}{\pgfpoint{\energese@trn@w}{0pt}}
+    \anchor{west}{\pgfpoint{-\energese@trn@w}{0pt}}
+    \anchor{energy_in}{\pgfmathsetmacro{\es@w}{\energese@trn@w}%
+        \pgfmathsetmacro{\es@h}{\energese@trn@h}%
+        \pgfpoint{-0.5*\es@w pt}{-0.5*\es@h pt}}
+    \anchor{energy_out}{\pgfmathsetmacro{\es@w}{\energese@trn@w}%
+        \pgfmathsetmacro{\es@h}{\energese@trn@h}%
+        \pgfpoint{0.5*\es@w pt}{-0.5*\es@h pt}}
+    \anchor{money_in}{\pgfmathsetmacro{\es@w}{\energese@trn@w}%
+        \pgfmathsetmacro{\es@h}{\energese@trn@h}%
+        \pgfpoint{0.5*\es@w pt}{0.5*\es@h pt}}
+    \anchor{money_out}{\pgfmathsetmacro{\es@w}{\energese@trn@w}%
+        \pgfmathsetmacro{\es@h}{\energese@trn@h}%
+        \pgfpoint{-0.5*\es@w pt}{0.5*\es@h pt}}
+    \anchor{feedback_in}{\pgfmathsetmacro{\es@w}{\energese@trn@w}%
+        \pgfmathsetmacro{\es@h}{\energese@trn@h}%
+        \pgfpoint{0.5*\es@w pt}{0.5*\es@h pt}}
+    \anchor{feedback_out}{\pgfmathsetmacro{\es@w}{\energese@trn@w}%
+        \pgfmathsetmacro{\es@h}{\energese@trn@h}%
+        \pgfpoint{-0.5*\es@w pt}{0.5*\es@h pt}}
+    \anchor{heat_sink}{\pgfpoint{0pt}{-\energese@trn@h}}
+    \energese@ring{\energese@trn@h}{\energese@trn@rad}
+    \anchorborder{%
+        \pgf@xa=\pgf@x\pgf@ya=\pgf@y%
+        \pgf@process{\energese@trn@ne}%
+        \pgfpointborderellipse{\pgfqpoint{\pgf@xa}{\pgf@ya}}{\pgfqpoint{\pgf@x}{\pgf@y}}%
+    }
+    \backgroundpath{
+        \pgfmathsetmacro{\es@w}{\energese@trn@w}
+        \pgfmathsetmacro{\es@h}{\energese@trn@h}
+        \pgfpathmoveto{\pgfpoint{0pt}{\es@h pt}}
+        \pgfpathlineto{\pgfpoint{\es@w pt}{0pt}}
+        \pgfpathlineto{\pgfpoint{0pt}{-\es@h pt}}
+        \pgfpathlineto{\pgfpoint{-\es@w pt}{0pt}}
+        \pgfpathclose
+    }
+}
+
+%% -------------------------------------------------------------------------
+%% Interaction -- pointed on the right, notched on the left.
+%% -------------------------------------------------------------------------
+% The notch is where two or more inflows converge, so `energy_in' sits at its
+% apex rather than out on the bounding box. Half-height H = 1.15b, and
+% W = a + 1.17b gives an unlabelled symbol the aspect of 1.89 measured from
+% Odum's sheet. The notch depth and right taper both scale with H, and W clears
+% whichever of the two intrudes further.
+%
+% Taper and notch are deep (0.85H and 0.55H) so the front point and back notch
+% come to sharp angles as Odum draws them. They shorten the flat top and bottom
+% without touching the bounding box, so the aspect above is unaffected.
+\pgfdeclareshape{energese interaction}{
+    \saveddimen\energese@int@w{\energese@fit{1.886}{0.708}{0.85}\pgf@x=\energese@outw}
+    \saveddimen\energese@int@h{\energese@fit{1.886}{0.708}{0.85}\pgf@x=\energese@outh}
+    \savedanchor\energese@int@ne{\energese@fit{1.886}{0.708}{0.85}%
+        \pgf@x=\energese@outw \pgf@y=\energese@outh}
+    \anchor{center}{\pgfpointorigin}
+    \anchor{text}{\energese@textanchor}
+    \anchor{north}{\pgfpoint{0pt}{\energese@int@h}}
+    \anchor{south}{\pgfpoint{0pt}{-\energese@int@h}}
+    \anchor{east}{\pgfpoint{\energese@int@w}{0pt}}
+    % Due west of an interaction is inside the notch, where there is no
+    % outline: -W on the axis is the void between the two upper and lower left
+    % corners, and a pathway drawn to it starts in mid-air. The westmost point
+    % of the symbol itself is the notch apex.
+    \anchor{west}{\pgfmathsetmacro{\es@w}{\energese@int@w}%
+        \pgfmathsetmacro{\es@h}{\energese@int@h}%
+        \pgfpoint{-\es@w pt + 0.55*\es@h pt}{0pt}}
+    % The notch apex, where converging inflows meet.
+    \anchor{energy_in}{\pgfmathsetmacro{\es@w}{\energese@int@w}%
+        \pgfmathsetmacro{\es@h}{\energese@int@h}%
+        \pgfpoint{-\es@w pt + 0.55*\es@h pt}{0pt}}
+    \anchor{energy_out}{\pgfpoint{\energese@int@w}{0pt}}
+    \anchor{money_in}{\pgfmathsetmacro{\es@w}{\energese@int@w}%
+        \pgfmathsetmacro{\es@h}{\energese@int@h}%
+        \pgfpoint{\es@w pt - 0.35*\es@h pt}{0.5*\es@h pt}}
+    \anchor{money_out}{\pgfmathsetmacro{\es@w}{\energese@int@w}%
+        \pgfmathsetmacro{\es@h}{\energese@int@h}%
+        \pgfpoint{-\es@w pt + 0.275*\es@h pt}{0.5*\es@h pt}}
+    \anchor{feedback_in}{\pgfpoint{0pt}{\energese@int@h}}
+    \anchor{feedback_out}{\pgfmathsetmacro{\es@w}{\energese@int@w}%
+        \pgfpoint{-0.3*\es@w pt}{\energese@int@h}}
+    \anchor{heat_sink}{\pgfpoint{0pt}{-\energese@int@h}}
+    \energese@ring{\energese@int@h}{\energese@int@rad}
+    \anchorborder{%
+        \pgf@xa=\pgf@x\pgf@ya=\pgf@y%
+        \pgf@process{\energese@int@ne}%
+        \pgfpointborderellipse{\pgfqpoint{\pgf@xa}{\pgf@ya}}{\pgfqpoint{\pgf@x}{\pgf@y}}%
+    }
+    \backgroundpath{
+        \pgfmathsetmacro{\es@w}{\energese@int@w}
+        \pgfmathsetmacro{\es@h}{\energese@int@h}
+        \pgfmathsetmacro{\es@notch}{0.55*\es@h}
+        \pgfmathsetmacro{\es@taper}{0.85*\es@h}
+        \pgfpathmoveto{\pgfpoint{-\es@w pt}{\es@h pt}}
+        \pgfpathlineto{\pgfpoint{\es@w pt - \es@taper pt}{\es@h pt}}
+        \pgfpathlineto{\pgfpoint{\es@w pt}{0pt}}
+        \pgfpathlineto{\pgfpoint{\es@w pt - \es@taper pt}{-\es@h pt}}
+        \pgfpathlineto{\pgfpoint{-\es@w pt}{-\es@h pt}}
+        \pgfpathlineto{\pgfpoint{-\es@w pt + \es@notch pt}{0pt}}
+        \pgfpathclose
+    }
+}
+
+%% -------------------------------------------------------------------------
+%% Gain -- Odum's constant-gain amplifier: a triangle pointing right.
+%% -------------------------------------------------------------------------
+% Measured aspect 0.923 against a reference of 0.917. H = 2.6b and
+% W = 2.4*max(a,b) hold that proportion.
+%
+% A triangle is a poor container for centred text: fitting the full corners of a
+% label's bounding box would force H = 3.09b, making the symbol three times a
+% producer's height. Instead the label's middle band is guaranteed to fit (at
+% y = b/2 the edge is at 1.48a) and the extreme corners of the bounding box --
+% normally whitespace above the x-height -- may sit outside. Odum labels
+% amplifiers with a single character; long labels here will look wrong.
+\pgfdeclareshape{energese gain}{
+    \saveddimen\energese@gan@w{\energese@fit{0.917}{0.45}{0.55}\pgf@x=\energese@outw}
+    \saveddimen\energese@gan@h{\energese@fit{0.917}{0.45}{0.55}\pgf@x=\energese@outh}
+    \savedanchor\energese@gan@ne{\energese@fit{0.917}{0.45}{0.55}%
+        \pgf@x=\energese@outw \pgf@y=\energese@outh}
+    \anchor{center}{\pgfpointorigin}
+    \anchor{text}{\energese@textanchor}
+    \anchor{north}{\pgfmathsetmacro{\es@h}{\energese@gan@h}\pgfpoint{0pt}{0.5*\es@h pt}}
+    \anchor{south}{\pgfmathsetmacro{\es@h}{\energese@gan@h}\pgfpoint{0pt}{-0.5*\es@h pt}}
+    \anchor{east}{\pgfpoint{\energese@gan@w}{0pt}}
+    \anchor{west}{\pgfpoint{-\energese@gan@w}{0pt}}
+    \anchor{energy_in}{\pgfpoint{-\energese@gan@w}{0pt}}
+    \anchor{energy_out}{\pgfpoint{\energese@gan@w}{0pt}}
+    \anchor{money_in}{\pgfmathsetmacro{\es@w}{\energese@gan@w}%
+        \pgfmathsetmacro{\es@h}{\energese@gan@h}%
+        \pgfpoint{0.3*\es@w pt}{0.35*\es@h pt}}
+    \anchor{money_out}{\pgfmathsetmacro{\es@h}{\energese@gan@h}%
+        \pgfpoint{-\energese@gan@w}{0.5*\es@h pt}}
+    \anchor{feedback_in}{\pgfmathsetmacro{\es@h}{\energese@gan@h}\pgfpoint{0pt}{0.5*\es@h pt}}
+    \anchor{heat_sink}{\pgfmathsetmacro{\es@h}{\energese@gan@h}\pgfpoint{0pt}{-0.5*\es@h pt}}
+    \energese@ring{\energese@gan@h}{\energese@gan@rad}
+    \anchorborder{%
+        \pgf@xa=\pgf@x\pgf@ya=\pgf@y%
+        \pgf@process{\energese@gan@ne}%
+        \pgfpointborderellipse{\pgfqpoint{\pgf@xa}{\pgf@ya}}{\pgfqpoint{\pgf@x}{\pgf@y}}%
+    }
+    \backgroundpath{
+        \pgfmathsetmacro{\es@w}{\energese@gan@w}
+        \pgfmathsetmacro{\es@h}{\energese@gan@h}
+        \pgfpathmoveto{\pgfpoint{-\es@w pt}{\es@h pt}}
+        \pgfpathlineto{\pgfpoint{\es@w pt}{0pt}}
+        \pgfpathlineto{\pgfpoint{-\es@w pt}{-\es@h pt}}
+        \pgfpathclose
+    }
+}
+
+%% -------------------------------------------------------------------------
+%% Loop-limited converter -- a rectangle whose right side bows outward.
+%% -------------------------------------------------------------------------
+% Reference interior 54 x 53, aspect 1.019, of which the flat body is about
+% 40 x 53 and the bulge adds 14 -- so the bulge is 0.53b and the body is taller
+% than wide. The style therefore sets a minimum width below the minimum height;
+% that ratio, not the path, is what produces the reference aspect when
+% unlabelled. The bulge is a cubic whose control offset of 1.333d puts the
+% midpoint at exactly a + d.
+\pgfdeclareshape{energese loop_limited}{
+    \saveddimen\energese@lop@a{\energese@fit{1.019}{0.740}{1.0}%
+        \pgf@x=\energese@outw \advance\pgf@x by-.265\energese@outh}
+    \saveddimen\energese@lop@b{\energese@fit{1.019}{0.740}{1.0}\pgf@x=\energese@outh}
+    \savedanchor\energese@lop@ne{\energese@fit{1.019}{0.740}{1.0}%
+        \pgf@x=\energese@outw \pgf@y=\energese@outh}
+    \anchor{center}{\pgfpointorigin}
+    \anchor{text}{\energese@textanchor}
+    \anchor{north}{\pgfpoint{0pt}{\energese@lop@b}}
+    \anchor{south}{\pgfpoint{0pt}{-\energese@lop@b}}
+    \anchor{west}{\pgfpoint{-\energese@lop@a}{0pt}}
+    \anchor{east}{\pgfmathsetmacro{\es@a}{\energese@lop@a}%
+        \pgfmathsetmacro{\es@b}{\energese@lop@b}%
+        \pgfpoint{\es@a pt + 0.53*\es@b pt}{0pt}}
+    \anchor{energy_in}{\pgfpoint{-\energese@lop@a}{0pt}}
+    \anchor{energy_out}{\pgfmathsetmacro{\es@a}{\energese@lop@a}%
+        \pgfmathsetmacro{\es@b}{\energese@lop@b}%
+        \pgfpoint{\es@a pt + 0.53*\es@b pt}{0pt}}
+    \anchor{money_in}{\pgfmathsetmacro{\es@a}{\energese@lop@a}%
+        \pgfmathsetmacro{\es@b}{\energese@lop@b}%
+        \pgfpoint{\es@a pt + 0.36*\es@b pt}{0.5*\es@b pt}}
+    \anchor{money_out}{\pgfmathsetmacro{\es@b}{\energese@lop@b}%
+        \pgfpoint{-\energese@lop@a}{0.5*\es@b pt}}
+    \anchor{feedback_in}{\pgfmathsetmacro{\es@a}{\energese@lop@a}%
+        \pgfpoint{0.3*\es@a pt}{\energese@lop@b}}
+    \anchor{feedback_out}{\pgfmathsetmacro{\es@a}{\energese@lop@a}%
+        \pgfpoint{-0.3*\es@a pt}{\energese@lop@b}}
+    \anchor{heat_sink}{\pgfpoint{0pt}{-\energese@lop@b}}
+    \energese@ring{\energese@lop@b}{\energese@lop@rad}
+    \anchorborder{%
+        \pgf@xa=\pgf@x\pgf@ya=\pgf@y%
+        \pgf@process{\energese@lop@ne}%
+        \pgfpointborderellipse{\pgfqpoint{\pgf@xa}{\pgf@ya}}{\pgfqpoint{\pgf@x}{\pgf@y}}%
+    }
+    \backgroundpath{
+        \pgfmathsetmacro{\es@a}{\energese@lop@a}
+        \pgfmathsetmacro{\es@b}{\energese@lop@b}
+        \pgfmathsetmacro{\es@k}{0.707*\es@b}
+        \pgfpathmoveto{\pgfpoint{-\es@a pt}{\es@b pt}}
+        \pgfpathlineto{\pgfpoint{\es@a pt}{\es@b pt}}
+        \pgfpathcurveto{\pgfpoint{\es@a pt + \es@k pt}{\es@b pt}}
+                       {\pgfpoint{\es@a pt + \es@k pt}{-\es@b pt}}
+                       {\pgfpoint{\es@a pt}{-\es@b pt}}
+        \pgfpathlineto{\pgfpoint{-\es@a pt}{-\es@b pt}}
+        \pgfpathclose
+    }
+}
+
+%% -------------------------------------------------------------------------
+%% Switch -- on/off switching action: a square with all four sides bowed in.
+%% -------------------------------------------------------------------------
+% Reference aspect 1.036, met by W = 1.55*max(a,b) and H = 1.496b. Control
+% points at 0.62 of the half-extent put each bowed side's midpoint at 0.715 of
+% the half-extent, and that is where a label's edge has least room: 1.399 is the
+% coefficient at which the label exactly touches, so 1.55 leaves 12% clearance.
+\pgfdeclareshape{energese switch}{
+    \saveddimen\energese@swi@w{\energese@fit{1.036}{0.715}{0.715}\pgf@x=\energese@outw}
+    \saveddimen\energese@swi@h{\energese@fit{1.036}{0.715}{0.715}\pgf@x=\energese@outh}
+    \savedanchor\energese@swi@ne{\energese@fit{1.036}{0.715}{0.715}%
+        \pgf@x=\energese@outw \pgf@y=\energese@outh}
+    \anchor{center}{\pgfpointorigin}
+    \anchor{text}{\energese@textanchor}
+    \anchor{north}{\pgfmathsetmacro{\es@h}{\energese@swi@h}\pgfpoint{0pt}{0.715*\es@h pt}}
+    \anchor{south}{\pgfmathsetmacro{\es@h}{\energese@swi@h}\pgfpoint{0pt}{-0.715*\es@h pt}}
+    \anchor{east}{\pgfmathsetmacro{\es@w}{\energese@swi@w}\pgfpoint{0.715*\es@w pt}{0pt}}
+    \anchor{west}{\pgfmathsetmacro{\es@w}{\energese@swi@w}\pgfpoint{-0.715*\es@w pt}{0pt}}
+    \anchor{energy_in}{\pgfmathsetmacro{\es@w}{\energese@swi@w}\pgfpoint{-0.715*\es@w pt}{0pt}}
+    \anchor{energy_out}{\pgfmathsetmacro{\es@w}{\energese@swi@w}\pgfpoint{0.715*\es@w pt}{0pt}}
+    \anchor{money_in}{\pgfmathsetmacro{\es@w}{\energese@swi@w}%
+        \pgfmathsetmacro{\es@h}{\energese@swi@h}%
+        \pgfpoint{0.78*\es@w pt}{0.45*\es@h pt}}
+    \anchor{money_out}{\pgfmathsetmacro{\es@w}{\energese@swi@w}%
+        \pgfmathsetmacro{\es@h}{\energese@swi@h}%
+        \pgfpoint{-0.78*\es@w pt}{0.45*\es@h pt}}
+    \anchor{feedback_in}{\pgfmathsetmacro{\es@h}{\energese@swi@h}\pgfpoint{0pt}{0.715*\es@h pt}}
+    \anchor{feedback_out}{\pgfmathsetmacro{\es@w}{\energese@swi@w}%
+        \pgfmathsetmacro{\es@h}{\energese@swi@h}%
+        \pgfpoint{-0.4*\es@w pt}{0.79*\es@h pt}}
+    \anchor{heat_sink}{\pgfmathsetmacro{\es@h}{\energese@swi@h}\pgfpoint{0pt}{-0.715*\es@h pt}}
+    \energese@ring{\energese@swi@h}{\energese@swi@rad}
+    \anchorborder{%
+        \pgf@xa=\pgf@x\pgf@ya=\pgf@y%
+        \pgf@process{\energese@swi@ne}%
+        \pgfpointborderellipse{\pgfqpoint{\pgf@xa}{\pgf@ya}}{\pgfqpoint{\pgf@x}{\pgf@y}}%
+    }
+    \backgroundpath{
+        \pgfmathsetmacro{\es@w}{\energese@swi@w}
+        \pgfmathsetmacro{\es@h}{\energese@swi@h}
+        \pgfmathsetmacro{\es@cw}{0.62*\es@w}
+        \pgfmathsetmacro{\es@ch}{0.62*\es@h}
+        \pgfmathsetmacro{\es@qw}{0.45*\es@w}
+        \pgfmathsetmacro{\es@qh}{0.45*\es@h}
+        \pgfpathmoveto{\pgfpoint{-\es@w pt}{\es@h pt}}
+        \pgfpathcurveto{\pgfpoint{-\es@qw pt}{\es@ch pt}}{\pgfpoint{\es@qw pt}{\es@ch pt}}
+                       {\pgfpoint{\es@w pt}{\es@h pt}}
+        \pgfpathcurveto{\pgfpoint{\es@cw pt}{\es@qh pt}}{\pgfpoint{\es@cw pt}{-\es@qh pt}}
+                       {\pgfpoint{\es@w pt}{-\es@h pt}}
+        \pgfpathcurveto{\pgfpoint{\es@qw pt}{-\es@ch pt}}{\pgfpoint{-\es@qw pt}{-\es@ch pt}}
+                       {\pgfpoint{-\es@w pt}{-\es@h pt}}
+        \pgfpathcurveto{\pgfpoint{-\es@cw pt}{-\es@qh pt}}{\pgfpoint{-\es@cw pt}{\es@qh pt}}
+                       {\pgfpoint{-\es@w pt}{\es@h pt}}
+        \pgfpathclose
+    }
+}
+
+%% -------------------------------------------------------------------------
+%% Ground -- the heat-sink terminator. A fixed-size glyph, never labelled.
+%% -------------------------------------------------------------------------
 \pgfdeclareshape{energese ground}{
     \savedanchor\centerpoint{\pgfpointorigin}
     \anchor{center}{\centerpoint}
     \anchor{north}{\pgfpoint{0pt}{0pt}}
     \anchor{south}{\pgfpoint{0pt}{-0.3cm}}
+    \anchor{east}{\pgfpoint{0.2cm}{-0.1cm}}
+    \anchor{west}{\pgfpoint{-0.2cm}{-0.1cm}}
     \backgroundpath{
         \pgfpathmoveto{\pgfpoint{0pt}{0pt}}
         \pgfpathlineto{\pgfpoint{0pt}{-0.1cm}}
@@ -62,117 +910,5 @@
         \pgfpathmoveto{\pgfpoint{-0.05cm}{-0.24cm}}
         \pgfpathlineto{\pgfpoint{0.05cm}{-0.24cm}}
         \pgfusepath{draw}
-    }
-}
-
-\pgfdeclareshape{energese consumer}{
-    \savedanchor\centerpoint{\pgfpointorigin}
-    \saveddimen\halfwidth{\pgf@x=0.5cm}
-    \saveddimen\halfheight{\pgf@x=0.6cm}
-    \anchor{center}{\centerpoint}
-    \anchor{north}{\pgfpoint{0pt}{\halfheight}}
-    \anchor{south}{\pgfpoint{0pt}{-\halfheight}}
-    \anchor{east}{\pgfpoint{\halfwidth}{0pt}}
-    \anchor{west}{\pgfpoint{-\halfwidth}{0pt}}
-    \anchor{energy_in}{\pgfmathsetmacro{\hw}{\halfwidth}\pgfpoint{-0.7*\hw pt}{-0.05cm}}
-    \anchor{energy_out}{\pgfmathsetmacro{\hw}{\halfwidth}\pgfmathsetmacro{\hh}{\halfheight}\pgfpoint{\hw pt}{0.2*\hh pt}}
-    \anchor{money_in}{\pgfmathsetmacro{\hw}{\halfwidth}\pgfmathsetmacro{\hh}{\halfheight}\pgfpoint{\hw pt}{0.4*\hh pt}}
-    \anchor{money_out}{\pgfmathsetmacro{\hw}{\halfwidth}\pgfpoint{-0.7*\hw pt}{0.1cm}}
-    \anchor{feedback_in}{\pgfpoint{0.2cm}{\halfheight}}
-    \anchor{feedback_out}{\pgfpoint{-0.2cm}{\halfheight}}
-    \anchor{heat_sink}{\pgfpoint{0pt}{-\halfheight}}
-    \backgroundpath{
-        \pgfmathsetmacro{\hw}{\halfwidth}
-        \pgfmathsetmacro{\hh}{\halfheight}
-        \pgfmathsetmacro{\thh}{0.3*\hh}
-        \pgfmathsetmacro{\shw}{0.7*\hw}
-        \pgfpathmoveto{\pgfpoint{0pt}{\hh pt}}
-        \pgfpathlineto{\pgfpoint{\hw pt}{\thh pt}}
-        \pgfpathlineto{\pgfpoint{\hw pt}{-\thh pt}}
-        \pgfpathlineto{\pgfpoint{0pt}{-\hh pt}}
-        \pgfpathlineto{\pgfpoint{-\hw pt}{-\thh pt}}
-        \pgfpathlineto{\pgfpoint{-\shw pt}{0pt}}
-        \pgfpathlineto{\pgfpoint{-\hw pt}{\thh pt}}
-        \pgfpathclose
-    }
-}
-
-\pgfdeclareshape{energese storage}{
-    \savedanchor\centerpoint{\pgfpointorigin}
-    \saveddimen\halfwidth{\pgf@x=0.5cm}
-    \saveddimen\halfheight{\pgf@x=0.5cm}
-    \anchor{center}{\centerpoint}
-    \anchor{north}{\pgfpoint{0pt}{\halfheight}}
-    \anchor{south}{\pgfpoint{0pt}{-0.45cm}}
-    \anchor{east}{\pgfpoint{\halfwidth}{0pt}}
-    \anchor{west}{\pgfpoint{-\halfwidth}{0pt}}
-    \anchor{energy_in}{\pgfpoint{-\halfwidth}{0pt}}
-    \anchor{energy_out}{\pgfpoint{\halfwidth}{0pt}}
-    \anchor{money_in}{\pgfpoint{\halfwidth}{0.1cm}}
-    \anchor{money_out}{\pgfpoint{-\halfwidth}{0.1cm}}
-    \anchor{feedback_in}{\pgfpoint{0.2cm}{\halfheight}}
-    \anchor{feedback_out}{\pgfpoint{-0.2cm}{\halfheight}}
-    \anchor{heat_sink}{\pgfpoint{0pt}{-0.45cm}}
-    \backgroundpath{
-        \pgfmathsetmacro{\hw}{\halfwidth}
-        \pgfmathsetmacro{\hh}{\halfheight}
-        \pgfmathsetmacro{\basey}{0.2*\hh}
-        \pgfpathmoveto{\pgfpoint{-\hw pt}{\basey pt}}
-        \pgfpathlineto{\pgfpoint{0pt}{\hh pt}}
-        \pgfpathlineto{\pgfpoint{\hw pt}{\basey pt}}
-        \pgfpatharc{11.5}{-191.5}{\hw pt}
-        \pgfpathclose
-    }
-}
-
-\pgfdeclareshape{energese transaction}{
-    \savedanchor\centerpoint{\pgfpointorigin}
-    \saveddimen\halfsize{\pgf@x=0.4cm}
-    \anchor{center}{\centerpoint}
-    \anchor{north}{\pgfpoint{0pt}{\halfsize}}
-    \anchor{south}{\pgfpoint{0pt}{-\halfsize}}
-    \anchor{east}{\pgfpoint{\halfsize}{0pt}}
-    \anchor{west}{\pgfpoint{-\halfsize}{0pt}}
-    \anchor{energy_in}{\pgfpoint{-\halfsize}{-0.1cm}}
-    \anchor{energy_out}{\pgfpoint{\halfsize}{-0.1cm}}
-    \anchor{money_in}{\pgfpoint{\halfsize}{0.1cm}}
-    \anchor{money_out}{\pgfpoint{-\halfsize}{0.1cm}}
-    \anchor{feedback_in}{\pgfpoint{\halfsize}{0.15cm}}
-    \anchor{feedback_out}{\pgfpoint{-\halfsize}{0.15cm}}
-    \anchor{heat_sink}{\pgfpoint{0pt}{-\halfsize}}
-    \backgroundpath{
-        \pgfmathsetmacro{\hs}{\halfsize}
-        \pgfpathmoveto{\pgfpoint{0pt}{\hs pt}}
-        \pgfpathlineto{\pgfpoint{\hs pt}{0pt}}
-        \pgfpathlineto{\pgfpoint{0pt}{-\hs pt}}
-        \pgfpathlineto{\pgfpoint{-\hs pt}{0pt}}
-        \pgfpathclose
-    }
-}
-
-\pgfdeclareshape{energese interaction}{
-    \savedanchor\centerpoint{\pgfpointorigin}
-    \saveddimen\halfwidth{\pgf@x=0.5cm}
-    \saveddimen\halfheight{\pgf@x=0.4cm}
-    \anchor{center}{\centerpoint}
-    \anchor{north}{\pgfpoint{0pt}{\halfheight}}
-    \anchor{south}{\pgfpoint{0pt}{-\halfheight}}
-    \anchor{east}{\pgfpoint{\halfwidth}{0pt}}
-    \anchor{west}{\pgfpoint{-\halfwidth}{0pt}}
-    \anchor{energy_in}{\pgfmathsetmacro{\hw}{\halfwidth}\pgfpoint{-\hw pt}{0pt}}
-    \anchor{energy_out}{\pgfpoint{\halfwidth}{0pt}}
-    \anchor{money_in}{\pgfpoint{\halfwidth}{0.1cm}}
-    \anchor{money_out}{\pgfpoint{-\halfwidth}{0.1cm}}
-    \anchor{feedback_in}{\pgfpoint{0pt}{\halfheight}}
-    \anchor{heat_sink}{\pgfpoint{0pt}{-\halfheight}}
-    \backgroundpath{
-        \pgfmathsetmacro{\hw}{\halfwidth}
-        \pgfmathsetmacro{\hh}{\halfheight}
-        \pgfpathmoveto{\pgfpoint{-\hw pt}{\hh pt}}
-        \pgfpathlineto{\pgfpoint{0pt}{\hh pt}}
-        \pgfpathlineto{\pgfpoint{\hw pt}{0pt}}
-        \pgfpathlineto{\pgfpoint{0pt}{-\hh pt}}
-        \pgfpathlineto{\pgfpoint{-\hw pt}{-\hh pt}}
-        \pgfpathclose
     }
 }

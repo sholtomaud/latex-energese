@@ -1,0 +1,155 @@
+% Reading a GSSK model: what energese.normalise is required to do.
+%
+% The fixture is a real generator's output (tests/fixtures/gssk-grass.json,
+% written by gssk-dia), not a hand-made example, so these assertions are about
+% the file format as it actually arrives. See docs/gssk-interop.md.
+\documentclass{article}
+\usepackage{luacode}
+
+\begin{luacode*}
+    package.path = package.path .. ";./?.lua"
+    energese = require("energese-core")
+
+    -- Globals, not locals: each luacode block is its own chunk.
+    function load_fixture()
+        local f = assert(io.open("tests/fixtures/gssk-grass.json"))
+        local src = f:read("*all")
+        f:close()
+        return energese.parse_json(src)
+    end
+
+    function by_id(model, id)
+        for _, node in ipairs(model.nodes) do
+            if node.id == id then return node end
+        end
+        return nil
+    end
+\end{luacode*}
+
+\begin{document}
+
+\begin{luacode*}
+    -- 1. Untouched, a GSSK model is not an energese one. The point of stating
+    --    this is that normalisation is not a convenience: without it the file
+    --    is rejected, and the message names a field the author never wrote.
+    local raw = load_fixture()
+    local ok, err = energese.validate_schema(raw)
+    assert(not ok, "Test 1 FAILED: a raw GSSK model should not validate")
+    assert(err:match("Tr"), "Test 1 FAILED: unexpected rejection: " .. tostring(err))
+    texio.write_nl("v Test 1 PASSED: a raw GSSK model is rejected, on Tr")
+
+    -- 2. Normalised, it is.
+    local m = energese.normalise(load_fixture())
+    local ok2, err2 = energese.validate_schema(m)
+    assert(ok2, "Test 2 FAILED: still invalid after normalising: " .. tostring(err2))
+    texio.write_nl("v Test 2 PASSED: the normalised model validates")
+
+    -- 3. Endpoints. GSSK says origin/target where energese says from/to.
+    assert(m.edges[1].from == "sun" and m.edges[1].to == "grass",
+           "Test 3 FAILED: origin/target were not carried to from/to")
+    assert(m.edges[1].type == "energy",
+           "Test 3 FAILED: an edge with only `logic' got no drawing type")
+    texio.write_nl("v Test 3 PASSED: endpoints and a drawing type")
+
+    -- 4. Labels live in `visual`, because GSSK's schema forbids extra keys at
+    --    the top level of a node.
+    assert(by_id(m, "grass").label == "Grass Biomass",
+           "Test 4 FAILED: visual.label was not lifted")
+    texio.write_nl("v Test 4 PASSED: presentation is lifted out of `visual'")
+
+    -- 5. The sink is dropped, node and pathway both. Both languages state the
+    --    dissipation; carried across, it would be drawn twice -- energese adds
+    --    a ground and a pathway under any storage of its own accord.
+    assert(by_id(m, "heat_sink") == nil, "Test 5 FAILED: the sink node survived")
+    for _, edge in ipairs(m.edges) do
+        assert(edge.to ~= "heat_sink", "Test 5 FAILED: a pathway into the sink survived")
+    end
+    assert(#m.edges == 1, "Test 5 FAILED: expected one pathway, got " .. #m.edges)
+    texio.write_nl("v Test 5 PASSED: the sink collapses into energese's own")
+
+    -- 6. Coordinates. GSSK's canvas is pixels with y downwards; energese's
+    --    diagram is centimetres with y upwards. The sun is at the top of that
+    --    canvas (y=150) and the grass below it (y=340), so the sun must end up
+    --    ABOVE the grass -- the failure this catches is a diagram in which
+    --    dissipation runs upwards.
+    local sun, grass = by_id(m, "sun"), by_id(m, "grass")
+    assert(sun.y > grass.y, "Test 6 FAILED: the model came out upside down")
+    -- And in centimetres: 440 pixels is about 9 units, not 440 of them. TeX
+    -- abandons a dimension past 575cm, so the untransformed model does not
+    -- merely look wrong, it fails to typeset.
+    assert(math.abs(grass.x) < 20 and math.abs(grass.y) < 20,
+           "Test 6 FAILED: pixels were used as diagram units")
+    texio.write_nl("v Test 6 PASSED: pixels become units, and y is flipped")
+
+    -- 7. Transformity is derived from the chain, since GSSK has none: quality
+    --    rises from a source along the pathways, which is the ordering the
+    --    horizontal axis expresses.
+    assert(grass.Tr > sun.Tr, "Test 7 FAILED: derived transformity does not rise along the chain")
+    texio.write_nl("v Test 7 PASSED: transformity is derived from the chain")
+
+    -- 8. ... but only where the model is silent. An author's own value wins.
+    local supplied = load_fixture()
+    by_id(supplied, "grass").visual.Tr = 7000
+    energese.normalise(supplied)
+    assert(by_id(supplied, "grass").Tr == 7000,
+           "Test 8 FAILED: a supplied transformity was overwritten by the derivation")
+    texio.write_nl("v Test 8 PASSED: a supplied transformity wins")
+
+    -- 9. `layout = "auto"` throws the editor's placement away and lets the
+    --    grid place the diagram instead.
+    local auto = load_fixture()
+    auto.metadata = { energese = { layout = "auto" } }
+    energese.normalise(auto)
+    assert(by_id(auto, "grass").x == nil and by_id(auto, "grass").y == nil,
+           "Test 9 FAILED: layout=auto kept the canvas coordinates")
+    texio.write_nl("v Test 9 PASSED: layout=auto defers to the grid")
+
+    -- 10. A native energese model is not a GSSK one and must come through
+    --     untouched -- including its transformities, which are real values and
+    --     not chain depths.
+    local f = assert(io.open("examples/simple_system.json"))
+    local native = energese.parse_json(f:read("*all"))
+    f:close()
+    assert(not energese.is_gssk(native), "Test 10 FAILED: a native model was taken for GSSK")
+    local edges_before = #native.edges
+    energese.normalise(native)
+    assert(#native.edges == edges_before, "Test 10 FAILED: normalising changed a native model")
+    assert(by_id(native, "cow").Tr == 2000, "Test 10 FAILED: a native transformity was rewritten")
+    texio.write_nl("v Test 10 PASSED: a native model passes through untouched")
+\end{luacode*}
+
+\begin{luacode*}
+    -- 11. The rest of the vocabulary. GSSK and energese name most of Odum's
+    --     symbols identically; these four are where they differ, and
+    --     `system_frame' is the one that is deliberately not mapped -- it
+    --     should become a system boundary, but no sample carrying one has been
+    --     seen, and a converter that guessed would draw the wrong rectangle
+    --     without saying so. Rejection by name is the honest failure.
+    local vocab = {
+        nodes = {
+            { id = "x", type = "exchange", visual = { x = 0, y = 0 } },
+            { id = "b", type = "misc_box", visual = { x = 50, y = 0 } },
+            { id = "k", type = "constant", visual = { x = 100, y = 0 } },
+        },
+        edges = { { origin = "k", target = "x", logic = "linear" } },
+    }
+    energese.normalise(vocab)
+    assert(by_id(vocab, "x").type == "transaction", "Test 11 FAILED: exchange")
+    assert(by_id(vocab, "b").type == "box", "Test 11 FAILED: misc_box")
+    assert(by_id(vocab, "k").type == "source", "Test 11 FAILED: constant")
+    texio.write_nl("v Test 11 PASSED: the vocabulary that differs is mapped")
+
+    local framed = {
+        nodes = { { id = "f", type = "system_frame", visual = { x = 0, y = 0 } } },
+        edges = {},
+    }
+    energese.normalise(framed)
+    local ok11, err11 = energese.validate_schema(framed)
+    assert(not ok11 and err11:match("system_frame"),
+           "Test 12 FAILED: an unmapped type was accepted or renamed silently")
+    texio.write_nl("v Test 12 PASSED: system_frame is rejected by name, not dropped")
+\end{luacode*}
+
+All GSSK normalisation tests passed.
+
+\end{document}

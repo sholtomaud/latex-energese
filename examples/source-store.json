@@ -23,7 +23,7 @@
       "y": 3.6,
       "magnitude": 1.2,
       "label": "Q",
-      "label_options": "inner sep=1pt, font=\\large"
+      "label_options": "inner sep=1pt, font=\\sffamily\\large"
     },
     {
       "id": "sink",

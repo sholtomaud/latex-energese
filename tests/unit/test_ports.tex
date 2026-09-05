@@ -1,0 +1,88 @@
+% Ports: the rules \energeseport is meant to hold to.
+%
+% The golden images show where the pathways ended up; this asserts why. Each
+% check raises a TeX error when it fails, so the suite reports a failure rather
+% than a diagram that still looks plausible.
+\documentclass{standalone}
+\usepackage{energese}
+\makeatletter
+
+\newdimen\ts@x \newdimen\ts@y \newdimen\ts@u \newdimen\ts@v \newdimen\ts@tol
+% Two points agree if they are within a printer's tolerance of each other: the
+% port machinery runs through pgfmath, which rounds.
+\ts@tol=0.2pt
+
+\def\ts@anchor#1#2{\pgfpointanchor{#1}{#2}\ts@x=\pgf@x \ts@y=\pgf@y}
+% The port just allocated, as a point. \energeseportname is `node.anchor'.
+\def\ts@port{\expandafter\ts@portx\energeseportname\@nil}
+\def\ts@portx#1.#2\@nil{\pgfpointanchor{#1}{#2}\ts@u=\pgf@x \ts@v=\pgf@y}
+
+% Manhattan distance between the anchor point and the port point, left in
+% \ts@u. Both assertions consume it.
+\def\ts@dist{%
+    \advance\ts@u by-\ts@x \advance\ts@v by-\ts@y
+    \ifdim\ts@u<\z@ \ts@u=-\ts@u \fi
+    \ifdim\ts@v<\z@ \ts@v=-\ts@v \fi
+    \advance\ts@u by\ts@v}
+\def\ts@same#1{\ts@dist
+    \ifdim\ts@u>\ts@tol \PackageError{energese-test}{FAIL: #1}{}\fi}
+\def\ts@apart#1{\ts@dist
+    \ifdim\ts@u<\ts@tol \PackageError{energese-test}{FAIL: #1}{}\fi}
+
+% Is the allocated port one of the ring's? Splitting the name on `ring' leaves
+% nothing in front of it when it is.
+\def\ts@onring#1{\expandafter\ts@onringx\energeseportname\@nil{#1}}
+\def\ts@onringx#1.#2\@nil#3{\ts@onringy#2ring\@nil{#3}}
+\def\ts@onringy#1ring#2\@nil#3{%
+    \def\ts@head{#1}%
+    \ifx\ts@head\@empty\else
+        \PackageError{energese-test}{FAIL: #3}{}%
+    \fi}
+
+\begin{document}
+\begin{tikzpicture}
+    \node[energese consumer] (hub)   at ( 0, 0)   {Hub};
+    \node[energese source]   (above) at (-3, 1.5) {A};
+    \node[energese source]   (below) at (-3,-1.5) {B};
+    \node[energese storage]  (right) at ( 3, 0)   {C};
+    \node[energese text]     (note)  at ( 0,-3)   {note};
+
+    \energeseresetports
+
+    % 1. A named anchor on an axis is already a port, so quantising energy_in
+    %    moves it nowhere: the ring always carries a port at 180 degrees.
+    \energeseport{hub}{energy_in}{above}
+    \ts@anchor{hub}{energy_in}\ts@port
+    \ts@same{energy\string_in did not land on its own anchor}
+
+    % 2. A port holds one pathway: the second request for the same anchor is
+    %    given a different port ...
+    \energeseport{hub}{energy_in}{below}
+    \ts@anchor{hub}{energy_in}\ts@port
+    \ts@apart{two pathways were given the same port}
+
+    % 3. ... and it is one of this symbol's own ports, not a point invented
+    %    for the occasion.
+    \ts@onring{the second pathway was not put on the ring}
+
+    % 4. A third is pushed further out again, rather than back onto the first.
+    \energeseport{hub}{energy_in}{right}
+    \ts@anchor{hub}{energy_in}\ts@port
+    \ts@apart{the third pathway was given the anchor's own port}
+
+    % 5. A shape with no ring keeps the anchor it was asked for and claims
+    %    nothing: a `text' node takes its pathways at the centre.
+    \energeseport{note}{center}{hub}
+    \def\ts@expect{note.center}
+    \ifx\energeseportname\ts@expect\else
+        \PackageError{energese-test}{FAIL: a ringless shape was given a port}{}%
+    \fi
+
+    % 6. Claims last one diagram. After a reset the anchor's own port is free
+    %    again and the next pathway gets it back.
+    \energeseresetports
+    \energeseport{hub}{energy_in}{above}
+    \ts@anchor{hub}{energy_in}\ts@port
+    \ts@same{a reset did not release the ports}
+\end{tikzpicture}
+\end{document}

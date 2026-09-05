@@ -1,0 +1,20 @@
+% Auto-layout from TeX: no x/y coordinates anywhere. Columns come from the
+% transformity values, rows from the central-spine algorithm -- exactly as they
+% do for examples/simple_system.json.
+\documentclass{standalone}
+\usepackage{energese}
+\begin{document}
+\begin{energese}
+    \esmeta{column_spacing=3.0, row_spacing=1.5, show_heat_sink=true}
+
+    \esnode{sun}{source}         {Tr=1,    label={Sun}}
+    \esnode{grass}{producer}     {Tr=100,  label={Grass}}
+    \esnode{cow}{consumer}       {Tr=2000, label={Cow}}
+    \esnode{market}{transaction} {Tr=5000, label={Market}}
+
+    \esflow{sun}{grass}{energy}
+    \esflow{grass}{cow}{energy}
+    \esflow{cow}{market}{energy}
+    \esflow{market}{grass}{money_feedback}
+\end{energese}
+\end{document}
