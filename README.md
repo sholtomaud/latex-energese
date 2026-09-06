@@ -193,7 +193,7 @@ If this package contributed to work you are publishing, please cite the
 archived release:
 
 > Maud, S. (2026). *energese: Odum's Energy Systems Language as a LuaLaTeX
-> package* (v0.0.1) [Computer software]. Zenodo.
+> package* (v0.1.0) [Computer software]. Zenodo.
 > https://doi.org/10.5281/zenodo.22340275
 
 ```bibtex
@@ -201,7 +201,7 @@ archived release:
   author    = {Maud, Sholto},
   title     = {energese: Odum's Energy Systems Language as a {LuaLaTeX} package},
   year      = {2026},
-  version   = {v0.0.1},
+  version   = {v0.1.0},
   publisher = {Zenodo},
   doi       = {10.5281/zenodo.22340275},
   url       = {https://github.com/energese-project/latex-energese}
@@ -210,10 +210,11 @@ archived release:
 
 The DOI above is the **concept DOI**: it always resolves to the most recent
 release, which is what to cite unless a particular version is meant. Each
-release also has its own DOI — v0.0.1 is
-[10.5281/zenodo.22340276](https://doi.org/10.5281/zenodo.22340276).
-Machine-readable metadata is in [`CITATION.cff`](CITATION.cff), which GitHub
-uses for its *Cite this repository* button.
+release also mints its own version DOI — they are listed in the *Versions* box
+on the Zenodo record. Machine-readable metadata is in
+[`CITATION.cff`](CITATION.cff), which GitHub uses for its *Cite this
+repository* button, and [`CHANGELOG.md`](CHANGELOG.md) records what changed
+between releases.
 
 The notation itself is Odum's, and the work it comes from should be cited
 alongside the software:
