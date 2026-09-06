@@ -16,8 +16,8 @@ authors:
     # orcid: "https://orcid.org/0000-0000-0000-0000"
 repository-code: "https://github.com/energese-project/latex-energese"
 license: MIT
-version: v0.0.1
-date-released: "2026-09-05"
+version: v0.1.0
+date-released: "2026-09-06"
 doi: 10.5281/zenodo.22340275
 identifiers:
   - type: doi
@@ -26,6 +26,8 @@ identifiers:
   - type: doi
     value: 10.5281/zenodo.22340276
     description: "DOI for version v0.0.1"
+  # Each release mints its own version DOI once Zenodo has archived it; add
+  # the new one here after publishing, alongside the concept DOI above.
 abstract: >-
   energese renders H. T. Odum's Energy Systems Language (ESL) diagrams from a
   declarative model, in JSON or in TeX, as a LuaLaTeX package. Symbol geometry
