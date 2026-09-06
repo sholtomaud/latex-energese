@@ -13,6 +13,8 @@ the latest; version DOIs are listed in the record's *Versions* box.
 
 ## [0.1.0] — 2026-09-06
 
+DOI: [10.5281/zenodo.22466673](https://doi.org/10.5281/zenodo.22466673)
+
 The first release with the layout engine and the fidelity harness in the state
 the documentation describes. **Rendered output changes throughout**: pathways
 attach at different points, take different routes, and carry their labels

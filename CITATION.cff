@@ -24,6 +24,9 @@ identifiers:
     value: 10.5281/zenodo.22340275
     description: "Concept DOI, resolving to the latest version"
   - type: doi
+    value: 10.5281/zenodo.22466673
+    description: "DOI for version v0.1.0"
+  - type: doi
     value: 10.5281/zenodo.22340276
     description: "DOI for version v0.0.1"
   # Each release mints its own version DOI once Zenodo has archived it; add
